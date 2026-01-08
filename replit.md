@@ -6,26 +6,17 @@ Moments is a spontaneous social moments discovery app that allows users to creat
 ## Architecture
 
 ### Stack
-- **Backend**: Node.js with Express + TypeScript
-- **Database**: PostgreSQL (Replit's built-in Neon-backed database)
-- **ORM**: Drizzle ORM
+- **Backend**: Supabase (database, auth, storage, realtime)
 - **Frontend**: Vanilla JavaScript with ES Modules
 - **Maps**: Mapbox GL JS
-- **Authentication**: Session-based auth with bcrypt password hashing
+- **Server**: Express.js (static file server only)
 
 ### Project Structure
 ```
 /
-├── server/                 # Backend code
-│   ├── index.ts           # Express server entry point
-│   ├── routes.ts          # API routes and auth setup
-│   ├── storage.ts         # Database operations
-│   └── db.ts              # Drizzle database connection
-├── shared/
-│   └── schema.ts          # Drizzle schema definitions
 ├── public/                 # Frontend static files
 │   ├── js/
-│   │   ├── config.js      # API client functions
+│   │   ├── config.js      # Supabase client and API functions
 │   │   ├── map.js         # Main map page logic
 │   │   ├── moment.js      # Moment detail page
 │   │   ├── chat.js        # Chat page
@@ -34,14 +25,14 @@ Moments is a spontaneous social moments discovery app that allows users to creat
 │   ├── moment.html        # Moment detail page
 │   ├── chat.html          # Chat page
 │   └── styles.css         # Global styles
-├── uploads/               # User uploaded files (avatars, photos)
-├── drizzle.config.ts      # Drizzle configuration
-├── package.json
-└── tsconfig.json
+├── supabase/
+│   ├── migrations/        # Database migrations
+│   └── functions/         # Edge functions
+├── server.js              # Static file server
+└── package.json
 ```
 
-### Database Schema
-- **users**: Authentication accounts (email, password hash)
+### Database (Supabase)
 - **profiles**: User profiles (display name, country, languages, user type)
 - **moments**: Time-limited gatherings with location
 - **moment_participants**: Users who joined a moment
@@ -49,71 +40,36 @@ Moments is a spontaneous social moments discovery app that allows users to creat
 - **moment_photos**: Photos uploaded to moments
 - **sos_alerts**: Emergency alerts from users
 - **flags**: Content reports
-- **user_roles**: Admin/moderator roles
-- **sessions**: Express session storage
 
 ## Development
 
 ### Running the App
 ```bash
-npm run dev
+node server.js
 ```
 
-### Database Operations
-```bash
-npm run db:push      # Push schema changes to database
-npm run db:generate  # Generate migrations
-```
+## Environment Variables (Required)
+- **SUPABASE_URL**: Your Supabase project URL
+- **SUPABASE_ANON_KEY**: Your Supabase anonymous key
+- **MAPBOX_TOKEN**: Mapbox API token for maps
 
-## Environment Variables
-- **DATABASE_URL**: PostgreSQL connection string (auto-configured)
-- **MAPBOX_TOKEN**: Mapbox API token for maps (required)
-- **SESSION_SECRET**: Secret for session encryption (optional, has default)
+## Features
+- Map-based moment discovery with geolocation
+- Create and join ephemeral gatherings
+- Real-time chat with participants
+- Photo sharing with ephemeral images
+- SOS alerts for emergencies
+- Content moderation and reporting
+- Multi-language support badges
 
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Create new account
-- `POST /api/auth/login` - Login
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/user` - Get current user
-
-### Profiles
-- `POST /api/profiles` - Create profile
-- `GET /api/profiles/:id` - Get profile
-
-### Moments
-- `POST /api/moments` - Create moment
-- `GET /api/moments/:id` - Get moment details
-- `GET /api/moments/nearby` - Get nearby moments
-- `GET /api/moments/search` - Search moments
-- `GET /api/moments/:id/context` - Get moment context (badges, participant count)
-- `POST /api/moments/:id/join` - Join a moment
-- `POST /api/moments/:id/leave` - Leave a moment
-- `GET /api/moments/:id/participants` - Get participants
-- `GET /api/moments/:id/messages` - Get chat messages
-- `POST /api/moments/:id/messages` - Send message
-- `GET /api/moments/:id/photos` - Get photos
-- `POST /api/moments/:id/photos` - Upload photo
-
-### Other
-- `GET /api/sos-alerts` - Get active SOS alerts
-- `POST /api/sos-alerts` - Create SOS alert
-- `POST /api/flags` - Report content
-- `POST /api/upload/avatar` - Upload profile photo
-
-## Recent Changes
-- Migrated from Supabase to Replit's built-in PostgreSQL
-- Replaced Supabase auth with session-based authentication
-- Replaced Supabase client calls with REST API endpoints
-- Added file upload support for avatars and moment photos
-- Removed Supabase Edge Functions (moderation logic moved to server)
-
-## User Preferences
-- None recorded yet
+## Supabase Edge Functions
+- **cleanup-ephemeral-images**: Removes expired images
+- **cleanup-photos**: Cleans up old photos
+- **expire-moments**: Marks expired moments
+- **moderate-moment**: Content moderation
 
 ## Notes
-- The app requires a MAPBOX_TOKEN to display the map
-- User passwords are hashed with bcrypt
-- Sessions are stored in PostgreSQL for persistence
-- Photos are stored locally in the /uploads directory
+- Uses Supabase Realtime for live chat updates
+- Uses Supabase Storage for photo uploads
+- Uses Supabase Auth with magic links
+- Express.js only serves static files and injects environment variables
