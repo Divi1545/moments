@@ -49,41 +49,59 @@ async function initAuth() {
 async function checkAuthStatus() {
   const loader = document.getElementById('loader');
   
-  // Add timeout to prevent infinite loading
-  const timeoutPromise = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Connection timeout - please check your internet connection')), 15000)
-  );
-  
   try {
-    // Check for auth callback with timeout
-    let sessionResult;
-    try {
-      sessionResult = await Promise.race([
-        supabase.auth.getSession(),
-        timeoutPromise
-      ]);
-    } catch (sessionError) {
-      console.error('Session error:', sessionError);
-      // If session check fails (e.g. "signal aborted"), try to reload without hash
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        console.log('Clearing auth hash and retrying...');
-        window.history.replaceState(null, '', window.location.pathname);
-        sessionResult = await supabase.auth.getSession();
-      } else {
-        throw sessionError;
+    // Handle auth callback from magic link - parse hash manually if present
+    if (window.location.hash && window.location.hash.includes('access_token')) {
+      console.log('Processing auth callback...');
+      
+      // Parse the hash parameters
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      
+      if (accessToken && refreshToken) {
+        try {
+          // Set the session manually
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          
+          // Clear the hash from URL
+          window.history.replaceState(null, '', window.location.pathname);
+          
+          if (error) {
+            console.error('Session set error:', error);
+            throw error;
+          }
+          
+          if (data.session) {
+            currentUser = data.session.user;
+            console.log('User logged in via magic link:', currentUser.id);
+            
+            const hasProfile = await checkProfileExists(currentUser.id);
+            if (!hasProfile) {
+              showProfileModal();
+              loader.classList.add('hidden');
+            } else {
+              await initApp();
+              loader.classList.add('hidden');
+            }
+            return;
+          }
+        } catch (tokenError) {
+          console.error('Token processing error:', tokenError);
+          // Clear hash and continue to normal flow
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       }
     }
     
-    const { data: { session }, error } = sessionResult;
+    // Normal session check (no magic link callback)
+    const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
       console.error('Auth error:', error);
-      // If auth error related to token, clear and retry
-      if (error.message.includes('signal') || error.message.includes('aborted')) {
-        window.history.replaceState(null, '', window.location.pathname);
-        window.location.reload();
-        return;
-      }
       throw new Error('Authentication error: ' + error.message);
     }
     
