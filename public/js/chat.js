@@ -3,11 +3,13 @@
 // ============================================================================
 
 import { supabase, getCurrentUser, formatTime, showToast } from './config.js';
+import { validateImage, compressImage, getPreviewUrl } from './imageUtils.js';
 
 let momentId = null;
 let currentUser = null;
 let messagesChannel = null;
 let flaggedMessageId = null;
+let selectedChatImage = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -139,10 +141,38 @@ function appendMessage(message, animate = false) {
     messageEl.style.animation = 'fadeIn 0.3s ease';
   }
 
+  // Check if message is an image
+  const isImage = message.content.startsWith('[IMAGE]');
+  const imageUrl = isImage ? message.content.replace('[IMAGE]', '') : null;
+  
+  // Calculate time until disappears (5 minutes from creation)
+  const createdAt = new Date(message.created_at);
+  const expiresAt = new Date(createdAt.getTime() + 5 * 60 * 1000);
+  const now = new Date();
+  const timeLeft = Math.max(0, Math.floor((expiresAt - now) / 60000)); // minutes
+
   // Create avatar HTML - show photo if available, otherwise show initial
   const avatarHTML = profilePhotoUrl 
     ? `<div class="message-avatar"><img src="${profilePhotoUrl}" alt="${displayName}" onerror="this.style.display='none'; this.parentElement.textContent='${initial}';"></div>`
     : `<div class="message-avatar">${initial}</div>`;
+
+  // Create content HTML
+  let contentHTML;
+  if (isImage) {
+    // Check if image expired
+    if (timeLeft <= 0) {
+      contentHTML = `<div class="message-bubble expired-image">🚫 Image expired</div>`;
+    } else {
+      contentHTML = `
+        <div class="message-bubble image-message">
+          <img src="${imageUrl}" alt="Shared image" style="max-width: 200px; border-radius: 8px; display: block;">
+          <div class="ephemeral-timer">⏱️ Disappears in ${timeLeft} min</div>
+        </div>
+      `;
+    }
+  } else {
+    contentHTML = `<div class="message-bubble">${escapeHtml(message.content)}</div>`;
+  }
 
   messageEl.innerHTML = `
     ${avatarHTML}
@@ -151,7 +181,7 @@ function appendMessage(message, animate = false) {
         <span class="message-sender">${displayName}</span>
         <span class="message-time">${formatTime(message.created_at)}</span>
       </div>
-      <div class="message-bubble">${escapeHtml(message.content)}</div>
+      ${contentHTML}
       ${!isOwn ? `
         <div class="message-actions">
           <button class="message-flag-btn" data-message-id="${message.id}">Report</button>
@@ -169,6 +199,17 @@ function appendMessage(message, animate = false) {
       flaggedMessageId = message.id;
       document.getElementById('flagModal').classList.remove('hidden');
     });
+  }
+
+  // Auto-hide expired images
+  if (isImage && timeLeft > 0) {
+    setTimeout(() => {
+      const bubble = messageEl.querySelector('.message-bubble');
+      if (bubble) {
+        bubble.innerHTML = '🚫 Image expired';
+        bubble.classList.add('expired-image');
+      }
+    }, timeLeft * 60 * 1000);
   }
 
   scrollToBottom();
@@ -200,6 +241,46 @@ function setupEventListeners() {
     window.location.href = `moment.html?id=${momentId}`;
   });
 
+  // Image upload button
+  const uploadBtn = document.getElementById('uploadImageBtn');
+  const chatImageInput = document.getElementById('chatImageInput');
+  const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+  const imagePreview = document.getElementById('imagePreview');
+  const removeImageBtn = document.getElementById('removeImageBtn');
+
+  uploadBtn.addEventListener('click', () => {
+    chatImageInput.click();
+  });
+
+  chatImageInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      showToast(validation.error, 'error');
+      chatImageInput.value = '';
+      return;
+    }
+
+    try {
+      const previewUrl = await getPreviewUrl(file);
+      imagePreview.src = previewUrl;
+      imagePreviewContainer.classList.remove('hidden');
+      selectedChatImage = file;
+      showToast('Image selected! Click Send to share.', 'success');
+    } catch (error) {
+      console.error('Error loading image:', error);
+      showToast('Error loading image', 'error');
+    }
+  });
+
+  removeImageBtn.addEventListener('click', () => {
+    chatImageInput.value = '';
+    selectedChatImage = null;
+    imagePreviewContainer.classList.add('hidden');
+  });
+
   // Message form
   const form = document.getElementById('messageForm');
   const input = document.getElementById('messageInput');
@@ -208,28 +289,86 @@ function setupEventListeners() {
     e.preventDefault();
 
     const content = input.value.trim();
-    if (!content) return;
+    
+    // Must have either text or image
+    if (!content && !selectedChatImage) return;
 
-    // Optimistic UI update
+    // Disable inputs
     input.value = '';
     input.disabled = true;
+    uploadBtn.disabled = true;
 
-    const { error } = await supabase
-      .from('moment_messages')
-      .insert({
-        moment_id: momentId,
-        user_id: currentUser.id,
-        content,
-      });
+    try {
+      let photoUrl = null;
 
-    input.disabled = false;
-    input.focus();
+      // Upload image if selected
+      if (selectedChatImage) {
+        showToast('Uploading image...', 'info');
+        
+        // Compress image
+        const compressedBlob = await compressImage(selectedChatImage, 800, 0.8);
+        
+        // Upload to storage
+        const fileName = `${momentId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('moment-photos')
+          .upload(fileName, compressedBlob, {
+            contentType: 'image/jpeg',
+            cacheControl: '300' // 5 minutes cache
+          });
 
-    if (error) {
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error('Failed to upload image');
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('moment-photos')
+          .getPublicUrl(fileName);
+        
+        photoUrl = publicUrl;
+
+        // Save to moment_photos table
+        await supabase
+          .from('moment_photos')
+          .insert({
+            moment_id: momentId,
+            uploader_id: currentUser.id,
+            photo_url: fileName,
+            is_preview: false
+          });
+      }
+
+      // Send message (either text or image URL)
+      const messageContent = photoUrl ? `[IMAGE]${photoUrl}` : content;
+      
+      const { error } = await supabase
+        .from('moment_messages')
+        .insert({
+          moment_id: momentId,
+          user_id: currentUser.id,
+          content: messageContent,
+        });
+
+      if (error) throw error;
+
+      // Clear image selection
+      if (selectedChatImage) {
+        chatImageInput.value = '';
+        selectedChatImage = null;
+        imagePreviewContainer.classList.add('hidden');
+      }
+
+    } catch (error) {
       console.error('Error sending message:', error);
       showToast('Could not send message: ' + error.message, 'error');
       input.value = content; // Restore message
     }
+
+    input.disabled = false;
+    uploadBtn.disabled = false;
+    input.focus();
   });
 
   // Flag modal

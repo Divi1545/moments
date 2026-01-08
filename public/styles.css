@@ -57,11 +57,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 14px 20px;
   background: var(--gradient-primary);
   box-shadow: var(--shadow-lg);
   z-index: 100;
   min-height: 60px;
+  flex-wrap: wrap;
 }
 
 .logo {
@@ -70,6 +72,58 @@ body {
   color: var(--white);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+
+/* Search Container */
+.search-container {
+  position: relative;
+  flex: 1;
+  max-width: 400px;
+  min-width: 200px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 36px 8px 12px;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--gray-900);
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  background: var(--white);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.search-input::placeholder {
+  color: var(--gray-600);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  color: var(--gray-600);
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--gray-900);
+}
+
+.clear-search-btn.hidden {
+  display: none;
 }
 
 .chat-header-info {
@@ -797,6 +851,61 @@ label {
   margin-bottom: 24px;
 }
 
+/* SOS Button */
+.sos-button {
+  width: 100%;
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: var(--white);
+  padding: 16px 20px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  transition: all 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sos-button:active {
+  transform: scale(0.95);
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.5);
+}
+
+.sos-button.pressing {
+  animation: sosPressed 2s ease;
+  background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
+}
+
+@keyframes sosPressed {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); box-shadow: 0 8px 24px rgba(220, 38, 38, 0.6); }
+}
+
+.sos-icon {
+  font-size: 28px;
+  animation: sosPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sosPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.sos-text {
+  font-size: 16px;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: var(--white);
+  font-weight: 700;
+}
+
 .participants-section h3 {
   font-size: 19px;
   margin-bottom: 14px;
@@ -944,6 +1053,33 @@ label {
   box-shadow: 0 3px 10px rgba(255, 107, 138, 0.25);
 }
 
+.image-message {
+  padding: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.message.own .image-message {
+  background: transparent !important;
+}
+
+.ephemeral-timer {
+  font-size: 11px;
+  color: var(--warning);
+  font-weight: 600;
+  margin-top: 4px;
+  text-align: center;
+  background: rgba(255, 193, 7, 0.1);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.expired-image {
+  color: var(--gray-500);
+  font-style: italic;
+  text-align: center;
+}
+
 .message-actions {
   margin-top: 4px;
 }
@@ -965,11 +1101,71 @@ label {
 .message-form {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
-.message-form input {
+.message-form input[type="text"] {
   flex: 1;
   margin: 0;
+}
+
+.btn-upload-image {
+  font-size: 24px;
+  padding: 8px 12px;
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-upload-image:hover {
+  background: var(--primary);
+  color: var(--white);
+  transform: scale(1.05);
+}
+
+.image-preview-container {
+  position: relative;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--gray-50);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-preview {
+  max-width: 80px;
+  max-height: 80px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.btn-remove-image {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ephemeral-badge {
+  font-size: 11px;
+  background: var(--warning);
+  color: var(--white);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 600;
 }
 
 .typing-indicator {

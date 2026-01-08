@@ -98,6 +98,7 @@ async function loadMoment() {
   if (isParticipant) {
     document.getElementById('leaveBtn').classList.remove('hidden');
     document.getElementById('chatBtn').classList.remove('hidden');
+    document.getElementById('sosBtn').classList.remove('hidden'); // Show SOS button
   } else {
     const isFull = context?.participant_count >= moment.max_participants;
     if (!isFull) {
@@ -289,6 +290,113 @@ function setupEventListeners() {
       showToast('Moment reported. Thank you.', 'success');
       document.getElementById('flagModal').classList.add('hidden');
     }
+  });
+
+  // SOS button - long press
+  const sosBtn = document.getElementById('sosBtn');
+  const sosModal = document.getElementById('sosModal');
+  const confirmSosBtn = document.getElementById('confirmSosBtn');
+  const cancelSosBtn = document.getElementById('cancelSosBtn');
+  
+  let sosTimer = null;
+  let sosPressed = false;
+
+  // Mouse/Touch start
+  sosBtn.addEventListener('mousedown', () => {
+    sosPressed = true;
+    sosBtn.classList.add('pressing');
+    sosTimer = setTimeout(() => {
+      if (sosPressed) {
+        sosModal.classList.remove('hidden');
+        sosBtn.classList.remove('pressing');
+      }
+    }, 2000); // 2 seconds
+  });
+
+  sosBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    sosPressed = true;
+    sosBtn.classList.add('pressing');
+    sosTimer = setTimeout(() => {
+      if (sosPressed) {
+        sosModal.classList.remove('hidden');
+        sosBtn.classList.remove('pressing');
+      }
+    }, 2000);
+  });
+
+  // Mouse/Touch end
+  sosBtn.addEventListener('mouseup', () => {
+    sosPressed = false;
+    clearTimeout(sosTimer);
+    sosBtn.classList.remove('pressing');
+  });
+
+  sosBtn.addEventListener('touchend', () => {
+    sosPressed = false;
+    clearTimeout(sosTimer);
+    sosBtn.classList.remove('pressing');
+  });
+
+  sosBtn.addEventListener('mouseleave', () => {
+    sosPressed = false;
+    clearTimeout(sosTimer);
+    sosBtn.classList.remove('pressing');
+  });
+
+  // Confirm SOS alert
+  confirmSosBtn.addEventListener('click', async () => {
+    confirmSosBtn.disabled = true;
+    confirmSosBtn.textContent = 'Sending...';
+
+    try {
+      // Get current location
+      let lat = null, lng = null;
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 5000
+            });
+          });
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+        } catch (err) {
+          console.warn('Could not get location:', err);
+        }
+      }
+
+      // Create SOS alert
+      const { error } = await supabase
+        .from('sos_alerts')
+        .insert({
+          user_id: currentUser.id,
+          moment_id: momentId,
+          lat: lat,
+          lng: lng,
+          location: lat && lng ? `POINT(${lng} ${lat})` : null
+        });
+
+      if (error) {
+        console.error('Error creating SOS alert:', error);
+        showToast('Failed to send alert: ' + error.message, 'error');
+      } else {
+        showToast('🆘 ALERT SENT! Help is on the way!', 'success');
+        sosModal.classList.add('hidden');
+      }
+    } catch (error) {
+      console.error('Error sending SOS:', error);
+      showToast('Failed to send alert', 'error');
+    }
+
+    confirmSosBtn.disabled = false;
+    confirmSosBtn.textContent = 'Send Alert';
+  });
+
+  // Cancel SOS
+  cancelSosBtn.addEventListener('click', () => {
+    sosModal.classList.add('hidden');
   });
 }
 

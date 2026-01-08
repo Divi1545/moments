@@ -7,10 +7,14 @@ import { validateImage, createSquareThumbnail, getPreviewUrl } from './imageUtil
 
 let map = null;
 let markers = [];
+let sosMarkers = [];
 let userLocation = null;
 let selectedLocation = null;
 let currentUser = null;
 let selectionMarker = null;
+let searchTimeout = null;
+let currentSearchQuery = '';
+let sosChannel = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -341,7 +345,10 @@ async function initApp() {
     
     await initMap();
     setupCreateMomentButton();
+    setupSearch();
     await loadNearbyMoments();
+    await loadSOSAlerts();
+    subscribeToSOSAlerts();
   } catch (error) {
     console.error('App initialization error:', error);
     showErrorScreen('Failed to initialize app: ' + error.message);
@@ -464,68 +471,274 @@ function createMap(center) {
 // Load and Display Moments
 // ============================================================================
 
-async function loadNearbyMoments() {
+async function loadNearbyMoments(searchQuery = null) {
   if (!userLocation) return;
 
   // Clear existing markers
   markers.forEach(marker => marker.remove());
   markers = [];
 
-  // Query nearby moments
-  const { data: moments, error } = await supabase.rpc('get_nearby_moments', {
-    user_lat: userLocation[1],
-    user_lng: userLocation[0],
-    radius_meters: 5000,
-    limit_count: 50,
-  });
+  try {
+    let moments, error;
 
-  if (error) {
-    console.error('Error loading moments:', error);
+    // Use search if query provided, otherwise use nearby
+    if (searchQuery && searchQuery.trim()) {
+      const result = await supabase.rpc('search_moments', {
+        search_query: searchQuery.trim(),
+        user_lat: userLocation[1],
+        user_lng: userLocation[0],
+        radius_meters: 10000, // 10km for search
+        limit_count: 50,
+      });
+      moments = result.data;
+      error = result.error;
+    } else {
+      const result = await supabase.rpc('get_nearby_moments', {
+        user_lat: userLocation[1],
+        user_lng: userLocation[0],
+        radius_meters: 5000,
+        limit_count: 50,
+      });
+      moments = result.data;
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Error loading moments:', error);
+      showToast('Error loading moments', 'error');
+      return;
+    }
+
+    // Show message if no results
+    if (!moments || moments.length === 0) {
+      if (searchQuery && searchQuery.trim()) {
+        showToast(`No moments found for "${searchQuery}"`, 'info');
+      }
+      return;
+    }
+
+    // Add markers for each moment
+    moments.forEach(moment => {
+      const el = document.createElement('div');
+      el.className = 'marker';
+      el.style.cssText = `
+        width: 32px;
+        height: 32px;
+        background: #6366f1;
+        border: 3px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      `;
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([moment.lng, moment.lat])
+        .addTo(map);
+
+      // Create popup
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`
+          <div style="min-width: 200px;">
+            <h3>${moment.title}</h3>
+            <p>${formatDateTime(moment.starts_at)}</p>
+            <p>👥 ${moment.participant_count}/${moment.max_participants}</p>
+            <button 
+              class="btn-primary" 
+              onclick="window.location.href='moment.html?id=${moment.id}'"
+              style="margin-top: 8px;"
+            >
+              View Details
+            </button>
+          </div>
+        `);
+
+      marker.setPopup(popup);
+      markers.push(marker);
+    });
+
+    // Show count if searching
+    if (searchQuery && searchQuery.trim()) {
+      showToast(`Found ${moments.length} moment${moments.length !== 1 ? 's' : ''}`, 'success');
+    }
+  } catch (error) {
+    console.error('Error in loadNearbyMoments:', error);
     showToast('Error loading moments', 'error');
-    return;
   }
 
-  // Add markers for each moment
-  moments.forEach(moment => {
-    const el = document.createElement('div');
-    el.className = 'marker';
-    el.style.cssText = `
-      width: 32px;
-      height: 32px;
-      background: #6366f1;
-      border: 3px solid white;
-      border-radius: 50%;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    `;
+  // Auto-refresh every 30 seconds (only if not searching)
+  if (!searchQuery) {
+    setTimeout(() => loadNearbyMoments(), 30000);
+  }
+}
 
-    const marker = new mapboxgl.Marker(el)
-      .setLngLat([moment.lng, moment.lat])
-      .addTo(map);
+// ============================================================================
+// Search Setup
+// ============================================================================
 
-    // Create popup
-    const popup = new mapboxgl.Popup({ offset: 25 })
-      .setHTML(`
-        <div style="min-width: 200px;">
-          <h3>${moment.title}</h3>
-          <p>${formatDateTime(moment.starts_at)}</p>
-          <p>👥 ${moment.participant_count}/${moment.max_participants}</p>
-          <button 
-            class="btn-primary" 
-            onclick="window.location.href='moment.html?id=${moment.id}'"
-            style="margin-top: 8px;"
-          >
-            View Details
-          </button>
-        </div>
-      `);
+function setupSearch() {
+  const searchInput = document.getElementById('searchInput');
+  const clearBtn = document.getElementById('clearSearch');
 
-    marker.setPopup(popup);
-    markers.push(marker);
+  if (!searchInput || !clearBtn) return;
+
+  // Handle search input with debounce
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value;
+
+    // Show/hide clear button
+    if (query.trim()) {
+      clearBtn.classList.remove('hidden');
+    } else {
+      clearBtn.classList.add('hidden');
+    }
+
+    // Debounce search (300ms)
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      currentSearchQuery = query;
+      loadNearbyMoments(query);
+    }, 300);
   });
 
-  // Auto-refresh every 30 seconds
-  setTimeout(loadNearbyMoments, 30000);
+  // Handle clear button
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    currentSearchQuery = '';
+    clearBtn.classList.add('hidden');
+    loadNearbyMoments(); // Reload default nearby moments
+    showToast('Search cleared', 'info');
+  });
+
+  // Handle enter key
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      clearTimeout(searchTimeout);
+      currentSearchQuery = searchInput.value;
+      loadNearbyMoments(searchInput.value);
+    }
+  });
+}
+
+// ============================================================================
+// SOS Alert Display
+// ============================================================================
+
+async function loadSOSAlerts() {
+  if (!map) return;
+
+  try {
+    // Get active SOS alerts
+    const { data: alerts, error } = await supabase
+      .from('sos_alerts')
+      .select(`
+        id,
+        lat,
+        lng,
+        created_at,
+        moment_id,
+        moments (title)
+      `)
+      .is('resolved_at', null);
+
+    if (error) {
+      console.error('Error loading SOS alerts:', error);
+      return;
+    }
+
+    if (!alerts || alerts.length === 0) return;
+
+    // Clear existing SOS markers
+    sosMarkers.forEach(marker => marker.remove());
+    sosMarkers = [];
+
+    // Add SOS markers
+    alerts.forEach(alert => {
+      if (!alert.lat || !alert.lng) return;
+
+      const el = document.createElement('div');
+      el.className = 'sos-marker';
+      el.style.cssText = `
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        border: 4px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 0 20px rgba(220, 38, 38, 0.6);
+        animation: sosPulse 1.5s ease-in-out infinite;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+      `;
+      el.textContent = '🆘';
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([alert.lng, alert.lat])
+        .addTo(map);
+
+      // Create popup
+      const popup = new mapboxgl.Popup({ offset: 30 })
+        .setHTML(`
+          <div style="min-width: 200px;">
+            <h3 style="color: #dc2626;">🆘 EMERGENCY ALERT</h3>
+            <p><strong>Moment:</strong> ${alert.moments?.title || 'Unknown'}</p>
+            <p><strong>Time:</strong> ${formatDateTime(alert.created_at)}</p>
+            <button 
+              class="btn-primary" 
+              onclick="window.location.href='moment.html?id=${alert.moment_id}'"
+              style="margin-top: 8px; background: #dc2626;"
+            >
+              View Details
+            </button>
+          </div>
+        `);
+
+      marker.setPopup(popup);
+      sosMarkers.push({ marker, id: alert.id });
+    });
+
+  } catch (error) {
+    console.error('Error in loadSOSAlerts:', error);
+  }
+}
+
+function subscribeToSOSAlerts() {
+  // Subscribe to new SOS alerts
+  sosChannel = supabase
+    .channel('sos-alerts')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'sos_alerts'
+      },
+      async (payload) => {
+        console.log('New SOS alert:', payload);
+        await loadSOSAlerts();
+        showToast('🆘 NEW EMERGENCY ALERT!', 'error');
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'sos_alerts'
+      },
+      async (payload) => {
+        // If resolved, remove marker
+        if (payload.new.resolved_at) {
+          const markerIndex = sosMarkers.findIndex(m => m.id === payload.new.id);
+          if (markerIndex >= 0) {
+            sosMarkers[markerIndex].marker.remove();
+            sosMarkers.splice(markerIndex, 1);
+          }
+        }
+      }
+    )
+    .subscribe();
 }
 
 // ============================================================================
@@ -613,9 +826,25 @@ function setupCreateMomentButton() {
     }
   });
 
-  createBtn.addEventListener('click', () => {
+  createBtn.addEventListener('click', async () => {
     if (!map) {
       showToast('Map is not ready. Please wait a moment.', 'error');
+      return;
+    }
+    
+    // Check if user already has an active hosted moment
+    const { data: checkResult, error } = await supabase.rpc('check_user_active_hosted_moment', {
+      user_uuid: currentUser.id
+    });
+    
+    if (error) {
+      console.error('Error checking active moment:', error);
+      showToast('Error checking your moments', 'error');
+      return;
+    }
+    
+    if (checkResult && checkResult.length > 0 && checkResult[0].has_active_moment) {
+      showToast(`You already have an active moment: "${checkResult[0].moment_title}". End it first!`, 'error');
       return;
     }
     

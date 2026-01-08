@@ -55,10 +55,34 @@
           <button id="chatBtn" class="btn-primary hidden">Open Chat</button>
         </div>
 
+        <!-- SOS Button (for participants only) -->
+        <button id="sosBtn" class="sos-button hidden">
+          <span class="sos-icon">🆘</span>
+          <span class="sos-text">Hold for Emergency</span>
+        </button>
+
         <!-- Participants List -->
         <div class="participants-section">
           <h3>Participants</h3>
           <div id="participantsList" class="participants-list"></div>
+        </div>
+      </div>
+
+      <!-- SOS Confirmation Modal -->
+      <div id="sosModal" class="modal hidden">
+        <div class="modal-content">
+          <h2>🆘 Emergency Alert</h2>
+          <p>This will immediately notify:</p>
+          <ul style="text-align: left; margin: 20px 0;">
+            <li>✅ All participants in this moment</li>
+            <li>✅ All moderators and admins</li>
+            <li>✅ Your location will be highlighted on the map</li>
+          </ul>
+          <p><strong>Only use in real emergencies!</strong></p>
+          <div class="action-buttons" style="margin-top: 20px;">
+            <button id="confirmSosBtn" class="btn-danger">Send Alert</button>
+            <button id="cancelSosBtn" class="btn-secondary">Cancel</button>
+          </div>
         </div>
       </div>
 

@@ -32,6 +32,15 @@
     <footer class="chat-footer">
       <form id="messageForm" class="message-form">
         <input 
+          type="file" 
+          id="chatImageInput" 
+          accept="image/jpeg,image/png" 
+          class="hidden"
+        >
+        <button type="button" id="uploadImageBtn" class="btn-upload-image" title="Upload ephemeral image">
+          📷
+        </button>
+        <input 
           type="text" 
           id="messageInput" 
           placeholder="Type a message..." 
@@ -40,6 +49,11 @@
         >
         <button type="submit" class="btn-send">Send</button>
       </form>
+      <div id="imagePreviewContainer" class="image-preview-container hidden">
+        <img id="imagePreview" class="image-preview" alt="Preview">
+        <button type="button" id="removeImageBtn" class="btn-remove-image">✕</button>
+        <span class="ephemeral-badge">⏱️ Disappears in 5 min</span>
+      </div>
     </footer>
 
     <!-- Loading State -->

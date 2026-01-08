@@ -1,399 +1,328 @@
-# Moments MVP - Replit + GoodBarber Deployment Guide
+# 🚀 Deployment Guide - Moments App
 
-Complete step-by-step guide to deploy your Moments MVP on Replit and embed it in GoodBarber.
+## ✅ COMPLETE FEATURE LIST
 
-**Total Time:** ~30-40 minutes
+### Core Features
+- ✅ User authentication & profile creation with photo upload
+- ✅ Interactive map with location-based moments
+- ✅ Create moments (2-100 participants, with preview photos)
+- ✅ Join/leave moments (host 1, join many)
+- ✅ Real-time group chat with profile avatars
+- ✅ Flag inappropriate content
+
+### NEW Features Implemented
+- ✅ **Search** - Find moments by keyword within 10km
+- ✅ **Multi-Join** - Host 1 moment, join unlimited others
+- ✅ **Ephemeral Images** - Share photos in chat that disappear after 5 minutes
+- ✅ **SOS Safety System** - Emergency alerts with location tracking
+- ✅ **Auto Photo Cleanup** - Moment photos deleted 2 days after end, profiles after 60 days inactivity
 
 ---
 
-## 📋 Pre-Deployment Checklist
+## 📋 DEPLOYMENT STEPS
 
-Before starting, create accounts on:
-- [ ] [Supabase](https://supabase.com) (Backend + Database)
-- [ ] [Mapbox](https://mapbox.com) (Maps API)
-- [ ] [Replit](https://replit.com) (Hosting)
-- [ ] [GoodBarber](https://goodbarber.com) (Mobile app platform)
+### Step 1: Database Setup
 
----
+1. **Go to Supabase SQL Editor**
+   - Navigate to: https://supabase.com/dashboard/project/YOUR_PROJECT/sql/new
 
-## Part 1: Supabase Setup (15-20 min)
+2. **Run Complete Migration**
+   - Copy contents from: `supabase/migrations/004_complete_setup.sql`
+   - Paste into SQL Editor
+   - Click "Run"
+   - ✅ Verify success message appears
 
-### Step 1.1: Create Supabase Project
-
-1. Go to [supabase.com/dashboard](https://supabase.com/dashboard)
-2. Click **"New Project"**
-3. Fill in:
-   - **Project Name**: `moments-mvp` (or your choice)
-   - **Database Password**: Generate strong password (save it!)
-   - **Region**: Choose closest to your users
-4. Click **"Create new project"**
-5. Wait 2-3 minutes for provisioning
-
-### Step 1.2: Get API Credentials
-
-1. In your Supabase project dashboard, click **Settings** (gear icon)
-2. Navigate to **API** section
-3. Copy and save:
-   - **Project URL** (e.g., `https://abcdefgh.supabase.co`)
-   - **anon/public key** (starts with `eyJ...`)
-   - **service_role key** (⚠️ Keep secret! For Edge Functions only)
-
-### Step 1.3: Enable PostGIS Extension
-
-1. Click **SQL Editor** in left sidebar
-2. Click **"+ New query"**
-3. Paste and run:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+**Expected Result:**
+```
+✅ Database setup complete! All tables, functions, and policies ready!
 ```
 
-4. Click **RUN** (or press Ctrl/Cmd + Enter)
-5. You should see: `Success. No rows returned`
+---
 
-### Step 1.4: Run Database Migration
+### Step 2: Deploy Edge Functions
 
-1. Open the file `supabase/migrations/001_initial_schema.sql` from your project
-2. Copy the **entire contents**
-3. In Supabase SQL Editor, click **"+ New query"**
-4. Paste the migration SQL
-5. Click **RUN**
-6. Wait ~10 seconds
-7. Verify success:
-   - Go to **Database** → **Tables**
-   - You should see: `profiles`, `moments`, `moment_participants`, `moment_messages`, `flags`, `user_roles`
+#### A. Install Supabase CLI (if not already installed)
 
-### Step 1.5: Enable Realtime for Tables
-
-1. Go to **Database** → **Replication**
-2. Find `moment_messages` table
-   - Toggle **Realtime** to ON
-   - Check ✅ **INSERT** events
-3. Find `moment_participants` table
-   - Toggle **Realtime** to ON
-   - Check ✅ **INSERT** and **DELETE** events
-4. Click **Save** (if prompted)
-
-### Step 1.6: Configure Authentication
-
-1. Go to **Authentication** → **Providers**
-2. Find **Email** provider
-   - Ensure it's **Enabled**
-   - Enable **"Confirm email"** (recommended)
-3. Go to **Authentication** → **URL Configuration**
-4. Add your domains to **Redirect URLs** (add more later):
-   ```
-   http://localhost:3000/*
-   ```
-
-### Step 1.7: Deploy Edge Functions
-
-#### Install Supabase CLI
-
-```bash
-# macOS/Linux
-brew install supabase/tap/supabase
-
-# Windows (via npm)
-npm install -g supabase
-
-# Or via Scoop (Windows)
-scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+**Windows:**
+```powershell
 scoop install supabase
 ```
 
-#### Login and Link Project
-
+**Mac:**
 ```bash
-# Login to Supabase
+brew install supabase/tap/supabase
+```
+
+**Linux:**
+```bash
+brew install supabase/tap/supabase
+```
+
+#### B. Login to Supabase
+```bash
 supabase login
-
-# Link your project (get project ref from dashboard URL)
-supabase link --project-ref your-project-ref
 ```
 
-#### Deploy Functions
-
+#### C. Link Your Project
 ```bash
-# Deploy expire-moments function
-supabase functions deploy expire-moments
-
-# Deploy moderate-moment function (optional)
-supabase functions deploy moderate-moment
+supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-#### Set Up Cron Job for Auto-Expiry
+Find your project ref in the Supabase URL:
+`https://supabase.com/dashboard/project/[YOUR_PROJECT_REF]`
 
-1. In Supabase Dashboard, go to **Database** → **Extensions**
-2. Search for `pg_cron` and **Enable** it
-3. Go to **SQL Editor**, create new query:
+#### D. Deploy Functions
 
+**Deploy Ephemeral Image Cleanup (runs every 5 minutes):**
+```bash
+supabase functions deploy cleanup-ephemeral-images --no-verify-jwt
+```
+
+**Deploy Photo Cleanup (runs daily):**
+```bash
+supabase functions deploy cleanup-photos --no-verify-jwt
+```
+
+**Expected Output:**
+```
+✓ Deploying function...
+✓ Function deployed successfully!
+```
+
+---
+
+### Step 3: Configure Cron Jobs
+
+1. **Go to Supabase Dashboard** → **Database** → **Cron Jobs**
+2. **Add Two Cron Jobs:**
+
+#### Job 1: Cleanup Ephemeral Images
+- **Name**: `cleanup-ephemeral-images`
+- **Schedule**: `*/5 * * * *` (every 5 minutes)
+- **Command**:
 ```sql
--- Run expire-moments every 5 minutes
-SELECT cron.schedule(
-  'expire-moments-job',
-  '*/5 * * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/expire-moments',
-    headers := jsonb_build_object(
-      'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY',
-      'Content-Type', 'application/json'
-    )
-  );
-  $$
+SELECT net.http_post(
+  url:='https://YOUR_PROJECT_REF.supabase.co/functions/v1/cleanup-ephemeral-images',
+  headers:=jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key'))
 );
 ```
 
-4. Replace:
-   - `YOUR-PROJECT-REF` with your project reference
-   - `YOUR_SERVICE_ROLE_KEY` with your service role key (from Step 1.2)
-5. Run the query
-
----
-
-## Part 2: Mapbox Setup (5 min)
-
-### Step 2.1: Create Mapbox Account
-
-1. Go to [mapbox.com/signup](https://mapbox.com/signup)
-2. Sign up (free tier is sufficient for MVP)
-3. Verify your email
-
-### Step 2.2: Get Access Token
-
-1. Go to [account.mapbox.com](https://account.mapbox.com)
-2. Scroll to **Access tokens**
-3. Copy the **Default public token** (starts with `pk.`)
-4. Save it for next step
-
----
-
-## Part 3: Replit Deployment (10-15 min)
-
-### Step 3.1: Import to Replit
-
-1. Go to [replit.com](https://replit.com)
-2. Click **"+ Create Repl"**
-3. Select **"Import from GitHub"**
-4. Paste your repository URL
-5. Click **"Import from GitHub"**
-6. Wait for import to complete
-
-### Step 3.2: Add Secrets
-
-1. In Replit, click **"Tools"** → **"Secrets"** (or click lock icon in sidebar)
-2. Click **"New secret"** and add these 3 secrets:
-
-| Key | Value | Notes |
-|-----|-------|-------|
-| `SUPABASE_URL` | `https://yourproject.supabase.co` | From Supabase Step 1.2 |
-| `SUPABASE_ANON_KEY` | `eyJ...` | From Supabase Step 1.2 |
-| `MAPBOX_TOKEN` | `pk.eyJ...` | From Mapbox Step 2.2 |
-
-**Important:** Use exact key names (no `VITE_` prefix)
-
-### Step 3.3: Run the App
-
-1. Click **"Run"** (big green button at top)
-2. Wait 10-15 seconds for:
-   - Dependencies to install
-   - Server to start
-3. You should see in console:
-   ```
-   ✅ Moments MVP running on port 5000
-   🌐 Local: http://localhost:5000
-   📱 Replit URL: https://your-repl.username.repl.co
-   ```
-4. **Copy the Replit URL** - you'll need it for GoodBarber!
-
-### Step 3.4: Test the App
-
-1. Click the **"Webview"** pane in Replit
-2. The app should load and show:
-   - Auth screen (if not logged in)
-   - Map view (after login)
-3. Try creating a test moment to verify everything works
-
----
-
-## Part 4: GoodBarber Integration (10 min)
-
-### Step 4.1: Update Supabase Redirect URLs
-
-1. Go back to Supabase Dashboard
-2. Navigate to **Authentication** → **URL Configuration**
-3. Add your Replit URL to **Redirect URLs**:
-   ```
-   https://your-repl.username.repl.co/*
-   ```
-4. Click **Save**
-
-### Step 4.2: Add WebView Section in GoodBarber
-
-1. Log in to [goodbarber.com](https://www.goodbarber.com)
-2. Go to your app backend
-3. Click **"Sections"** → **"+ Add Section"**
-4. Choose **"Custom URL"** or **"WebView"**
-5. Name it: `Moments`
-
-### Step 4.3: Configure WebView Settings
-
-#### URL:
-- Paste your Replit URL: `https://your-repl.username.repl.co`
-
-#### Permissions (CRITICAL):
-- ✅ **Geolocation** (required for nearby moments)
-- ✅ **JavaScript** (required)
-- ✅ **Local storage** (required for auth)
-- ✅ **DOM Storage** (required for realtime)
-
-#### Navigation:
-- ✅ **Use internal navigation**: ON
-- ❌ **Open external links in browser**: OFF
-- ✅ **Display navigation bar**: ON (optional)
-
-#### Display:
-- **Orientation**: Portrait
-- **Pull to refresh**: Enabled
-- **Zoom**: Disabled
-- **Bounce effect**: Disabled
-
-### Step 4.4: Save and Test
-
-1. Click **"Save"**
-2. Open **GoodBarber Preview App** on your phone
-3. Navigate to **Moments** section
-4. Test:
-   - [ ] App loads
-   - [ ] Map displays
-   - [ ] Location access works
-   - [ ] Can create moment
-   - [ ] Can join moment
-   - [ ] Chat works
-
----
-
-## Part 5: Create Admin Account (5 min)
-
-### Step 5.1: Sign Up
-
-1. Open your Replit URL
-2. Enter your email and click "Send Magic Link"
-3. Check your email and click the link
-4. Complete your profile
-
-### Step 5.2: Grant Admin Role
-
-1. Go to Supabase Dashboard → **Authentication** → **Users**
-2. Copy your **User ID (UUID)**
-3. Go to **SQL Editor**, run:
-
+#### Job 2: Cleanup Photos
+- **Name**: `cleanup-photos`
+- **Schedule**: `0 3 * * *` (daily at 3 AM UTC)
+- **Command**:
 ```sql
-INSERT INTO user_roles (user_id, role) 
-VALUES ('YOUR-USER-UUID-HERE', 'admin');
+SELECT net.http_post(
+  url:='https://YOUR_PROJECT_REF.supabase.co/functions/v1/cleanup-photos',
+  headers:=jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key'))
+);
 ```
 
-4. Now you have admin access to view hidden/flagged content
+**Note:** Replace `YOUR_PROJECT_REF` with your actual Supabase project reference.
 
 ---
 
-## Part 6: Keep Repl Alive (Optional but Recommended)
+### Step 4: Verify Supabase Setup
 
-### Problem
-Free Repls sleep after 1 hour of inactivity.
+#### Check Storage Buckets
+1. Go to **Storage** in Supabase Dashboard
+2. Verify buckets exist:
+   - ✅ `avatars` (public)
+   - ✅ `moment-photos` (public)
 
-### Solutions
+#### Check Database Tables
+Run this query in SQL Editor:
+```sql
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+ORDER BY table_name;
+```
 
-**Option 1: Replit Hacker Plan** (Recommended)
-- Upgrade to Replit Hacker ($7/month)
-- Get "Always On" feature
-- Your Repl never sleeps
+**Expected Tables:**
+- ✅ profiles
+- ✅ moments
+- ✅ moment_participants
+- ✅ moment_messages
+- ✅ moment_photos
+- ✅ sos_alerts
+- ✅ flags
+- ✅ user_roles
 
-**Option 2: UptimeRobot** (Free)
-1. Go to [uptimerobot.com](https://uptimerobot.com)
-2. Create free account
-3. Add monitor:
-   - **Type**: HTTP(s)
-   - **URL**: Your Replit URL
-   - **Interval**: Every 5 minutes
-4. This pings your Repl to keep it awake
+#### Test Functions
+```sql
+-- Test search function
+SELECT * FROM search_moments('coffee', 6.9271, 79.8612, 10000, 10);
 
----
-
-## 🎉 You're Live!
-
-Your Moments MVP is now:
-- ✅ Hosted on Replit
-- ✅ Embedded in GoodBarber
-- ✅ Database on Supabase
-- ✅ Auto-expiry working
-
----
-
-## 📊 Post-Deployment Checklist
-
-### Security
-- [ ] Supabase RLS policies enabled (done via migration)
-- [ ] Service role key NOT in frontend code
-- [ ] Replit Secrets properly configured
-- [ ] Auth redirect URLs include Replit domain
-
-### Testing
-- [ ] Create moment works
-- [ ] Join moment works
-- [ ] Chat real-time works
-- [ ] Flagging works (test with 3 flags)
-- [ ] Auto-expiry works (wait or trigger manually)
-
-### Monitoring
-- [ ] Check Supabase Dashboard → Reports (API usage)
-- [ ] Check Replit logs for errors
-- [ ] Test on iOS and Android via GoodBarber Preview
+-- Test hosting check
+SELECT * FROM check_user_active_hosted_moment('YOUR_USER_ID');
+```
 
 ---
 
-## 🐛 Troubleshooting
+### Step 5: Update Replit Secrets
 
-### "Repl keeps sleeping"
-**Fix**: Use UptimeRobot or upgrade to Hacker plan
+1. **Go to Replit** → Your Project → **Secrets** (lock icon)
+2. **Ensure these secrets exist:**
+   - `SUPABASE_URL`: Your Supabase project URL
+   - `SUPABASE_ANON_KEY`: Your Supabase anon key
+   - `MAPBOX_TOKEN`: Your Mapbox access token
 
-### "Blank screen in GoodBarber"
-**Fix**: Enable JavaScript in WebView settings
-
-### "Map not loading"
-**Fix**: Check Mapbox token in Replit Secrets
-
-### "Auth redirects to external browser"
-**Fix**: 
-- Add Replit URL to Supabase redirect URLs
-- Disable "Open external links in browser" in GoodBarber
-
-### "Messages not real-time"
-**Fix**: Enable DOM Storage in GoodBarber WebView settings
-
-### "Can't join moment"
-**Fix**: Check moment hasn't expired and isn't full
+**Get values from:**
+- Supabase Dashboard → Settings → API
+- Mapbox Dashboard → Access Tokens
 
 ---
 
-## 📱 Next Steps
+### Step 6: Push Code to Git
 
-1. **Beta Test**: Share with 10-20 users
-2. **Monitor**: Check Supabase usage daily
-3. **Gather Feedback**: What works? What doesn't?
-4. **Iterate**: Add features based on user needs
-
----
-
-## 📚 Additional Resources
-
-- **Replit Docs**: [docs.replit.com](https://docs.replit.com)
-- **GoodBarber Guide**: [GOODBARBER.md](GOODBARBER.md)
-- **Supabase Docs**: [supabase.com/docs](https://supabase.com/docs)
-- **General README**: [README.md](README.md)
+```bash
+git add .
+git commit -m "Complete app: search, multi-join, ephemeral images, SOS, auto-cleanup"
+git push origin main
+```
 
 ---
 
-**Congratulations! Your app is live! 🚀**
+### Step 7: Deploy to Replit
+
+1. **Pull latest code** in Replit (if using Git sync)
+2. **Click "Run"** button
+3. **Wait for server to start**
+
+**Expected Console Output:**
+```
+Server running on port 3000
+Environment variables loaded
+Mapbox token configured
+```
+
+---
+
+## 🧪 TESTING CHECKLIST
+
+### Test 1: Sign Up & Profile
+- [ ] Click "Get Started"
+- [ ] Enter email/password → Creates account
+- [ ] Upload profile photo → Appears in preview
+- [ ] Complete profile form → Redirects to map
+
+### Test 2: Map View
+- [ ] Map loads with user location
+- [ ] Search bar appears in header
+- [ ] Type "coffee" → Shows filtered moments
+- [ ] Clear search → Shows all nearby moments
+
+### Test 3: Create Moment (Multi-Join)
+- [ ] Click "+ Create" → Modal opens
+- [ ] Fill form, upload preview photo
+- [ ] Submit → Moment created
+- [ ] Try creating another moment → **BLOCKED** with message
+- [ ] Can still join other moments
+
+### Test 4: Moment Detail & SOS
+- [ ] Click moment marker → View details
+- [ ] Click "Join Moment" → Joins successfully
+- [ ] SOS button appears for participants
+- [ ] Long-press SOS (2 seconds) → Confirmation modal
+- [ ] Confirm → Alert sent, appears on map
+
+### Test 5: Chat & Ephemeral Images
+- [ ] Open chat from moment detail
+- [ ] Send text message → Appears instantly
+- [ ] Click 📷 button → Upload image
+- [ ] Image appears with "Disappears in 5 min" badge
+- [ ] Wait 5 minutes → Image shows "🚫 Image expired"
+
+### Test 6: Profile Photos in Chat
+- [ ] Chat avatars show profile photos
+- [ ] If no photo → Shows initial letter
+
+---
+
+## 🎉 SUCCESS CRITERIA
+
+✅ **All features working:**
+- Search finds moments
+- Can only host 1 moment at a time
+- Can join multiple moments
+- Chat images disappear after 5 minutes
+- SOS alerts show on map
+- Profile/moment photos upload correctly
+
+✅ **No console errors**
+
+✅ **Database queries run successfully**
+
+✅ **Storage buckets accessible**
+
+---
+
+## 📊 MONITOR CLEANUP FUNCTIONS
+
+### Check Ephemeral Image Cleanup Logs
+```bash
+supabase functions logs cleanup-ephemeral-images
+```
+
+### Check Photo Cleanup Logs
+```bash
+supabase functions logs cleanup-photos
+```
+
+**Expected Output:**
+```json
+{
+  "success": true,
+  "message": "Photo cleanup completed",
+  "momentPhotosDeleted": 12,
+  "profilePhotosDeleted": 3,
+  "errors": 0
+}
+```
+
+---
+
+## 🐛 TROUBLESHOOTING
+
+### Issue: "relation does not exist"
+**Solution:** Re-run `004_complete_setup.sql` migration
+
+### Issue: Storage bucket not found
+**Solution:** Check Supabase Storage dashboard, manually create buckets if needed
+
+### Issue: SOS markers not appearing
+**Solution:** Check browser console for RLS policy errors, verify user is authenticated
+
+### Issue: Ephemeral images not deleting
+**Solution:** Check cron job is running, verify Edge Function deployed correctly
+
+### Issue: Can't create moment
+**Solution:** Check `check_user_active_hosted_moment` function exists and returns data
+
+---
+
+## 🎯 READY TO GO!
+
+Once all tests pass, your app is **LIVE** and ready for users! 🚀
+
+**App URL:** `https://your-replit-username.repl.co`
+
+---
+
+## 📝 NOTES
+
+- **Data Retention:**
+  - Chat images: 5 minutes
+  - Moment photos: 2 days after moment ends
+  - Profile photos: 60 days after last activity
+
+- **Storage Costs:** Near $0 due to aggressive cleanup
+
+- **Security:** All RLS policies active, users can only modify their own data
+
+- **Performance:** Real-time updates via Supabase Realtime
+
+---
+
+**Questions? Check the code comments or Supabase logs for detailed debugging!** 🎉
