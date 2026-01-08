@@ -1,77 +1,119 @@
 # Moments MVP
 
 ## Overview
+Moments is a spontaneous social moments discovery app that allows users to create and join ephemeral gatherings on a map. Users can see nearby moments, join them, chat with participants, and even trigger SOS alerts if needed.
 
-Moments MVP is a mobile-first web application for discovering spontaneous, time-limited social gatherings nearby. It's designed to be embedded in GoodBarber WebView as part of the IslandLoaf app ecosystem.
+## Architecture
 
-**Core Concept:** This is NOT a social network. It focuses on spontaneous gatherings - users discover active Moments happening nearby, join temporarily, chat in real-time, and leave when the Moment expires. No permanent DMs, no profile browsing, no follows.
+### Stack
+- **Backend**: Node.js with Express + TypeScript
+- **Database**: PostgreSQL (Replit's built-in Neon-backed database)
+- **ORM**: Drizzle ORM
+- **Frontend**: Vanilla JavaScript with ES Modules
+- **Maps**: Mapbox GL JS
+- **Authentication**: Session-based auth with bcrypt password hashing
 
-**Key Features:**
-- Map-based discovery of nearby gatherings (5km radius)
-- Time-limited Moments that auto-expire
-- Real-time group chat for participants
-- Context badges showing diversity (International, English-friendly) without segregation
-- Moderation system with flagging and auto-hide
-- Pink/coral themed UI (IslandLoaf branding)
+### Project Structure
+```
+/
+├── server/                 # Backend code
+│   ├── index.ts           # Express server entry point
+│   ├── routes.ts          # API routes and auth setup
+│   ├── storage.ts         # Database operations
+│   └── db.ts              # Drizzle database connection
+├── shared/
+│   └── schema.ts          # Drizzle schema definitions
+├── public/                 # Frontend static files
+│   ├── js/
+│   │   ├── config.js      # API client functions
+│   │   ├── map.js         # Main map page logic
+│   │   ├── moment.js      # Moment detail page
+│   │   ├── chat.js        # Chat page
+│   │   └── imageUtils.js  # Image processing utilities
+│   ├── index.html         # Main map page
+│   ├── moment.html        # Moment detail page
+│   ├── chat.html          # Chat page
+│   └── styles.css         # Global styles
+├── uploads/               # User uploaded files (avatars, photos)
+├── drizzle.config.ts      # Drizzle configuration
+├── package.json
+└── tsconfig.json
+```
+
+### Database Schema
+- **users**: Authentication accounts (email, password hash)
+- **profiles**: User profiles (display name, country, languages, user type)
+- **moments**: Time-limited gatherings with location
+- **moment_participants**: Users who joined a moment
+- **moment_messages**: Chat messages in moments
+- **moment_photos**: Photos uploaded to moments
+- **sos_alerts**: Emergency alerts from users
+- **flags**: Content reports
+- **user_roles**: Admin/moderator roles
+- **sessions**: Express session storage
+
+## Development
+
+### Running the App
+```bash
+npm run dev
+```
+
+### Database Operations
+```bash
+npm run db:push      # Push schema changes to database
+npm run db:generate  # Generate migrations
+```
+
+## Environment Variables
+- **DATABASE_URL**: PostgreSQL connection string (auto-configured)
+- **MAPBOX_TOKEN**: Mapbox API token for maps (required)
+- **SESSION_SECRET**: Secret for session encryption (optional, has default)
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Create new account
+- `POST /api/auth/login` - Login
+- `POST /api/auth/logout` - Logout
+- `GET /api/auth/user` - Get current user
+
+### Profiles
+- `POST /api/profiles` - Create profile
+- `GET /api/profiles/:id` - Get profile
+
+### Moments
+- `POST /api/moments` - Create moment
+- `GET /api/moments/:id` - Get moment details
+- `GET /api/moments/nearby` - Get nearby moments
+- `GET /api/moments/search` - Search moments
+- `GET /api/moments/:id/context` - Get moment context (badges, participant count)
+- `POST /api/moments/:id/join` - Join a moment
+- `POST /api/moments/:id/leave` - Leave a moment
+- `GET /api/moments/:id/participants` - Get participants
+- `GET /api/moments/:id/messages` - Get chat messages
+- `POST /api/moments/:id/messages` - Send message
+- `GET /api/moments/:id/photos` - Get photos
+- `POST /api/moments/:id/photos` - Upload photo
+
+### Other
+- `GET /api/sos-alerts` - Get active SOS alerts
+- `POST /api/sos-alerts` - Create SOS alert
+- `POST /api/flags` - Report content
+- `POST /api/upload/avatar` - Upload profile photo
+
+## Recent Changes
+- Migrated from Supabase to Replit's built-in PostgreSQL
+- Replaced Supabase auth with session-based authentication
+- Replaced Supabase client calls with REST API endpoints
+- Added file upload support for avatars and moment photos
+- Removed Supabase Edge Functions (moderation logic moved to server)
 
 ## User Preferences
+- None recorded yet
 
-Preferred communication style: Simple, everyday language.
-
-## System Architecture
-
-### Frontend Architecture
-- **Technology:** Vanilla HTML, CSS, and JavaScript (no frameworks)
-- **Styling:** Mobile-first CSS with IslandLoaf pink/coral theme (#FF6B8A primary)
-- **Map:** Mapbox GL JS v3.0.0 for geospatial visualization
-- **PWA Support:** Service worker (sw.js) and manifest.json for offline capabilities
-- **Pages:**
-  - `index.html` - Main map view with welcome screen and auth
-  - `moment.html` - Moment details and join/leave actions
-  - `chat.html` - Real-time group chat for participants
-
-### Backend Architecture
-- **Server:** Express.js serving static files with environment variable injection
-- **Authentication:** Supabase Magic Link (passwordless email auth)
-- **Database:** Supabase PostgreSQL with PostGIS extension for geospatial queries
-- **Real-time:** Supabase Realtime for live chat updates and participant tracking
-- **Security:** Row Level Security (RLS) policies on all tables
-
-### Data Storage
-- **Database Schema** (in `supabase/migrations/001_initial_schema.sql`):
-  - `profiles` - User profiles with privacy hardening
-  - `moments` - Gatherings with geospatial data (PostGIS geometry)
-  - `moment_participants` - Join/leave tracking
-  - `moment_messages` - Temporary group chat (participant-only access)
-  - `flags` - Moderation system (race-condition safe)
-  - `user_roles` - Admin/moderator roles
-
-### Key SQL Functions
-- `get_nearby_moments()` - PostGIS spatial query (5km default radius)
-- `get_moment_context()` - Privacy-safe context badges
-- `can_join_moment()` - Race-condition safe capacity check with row locks
-- `expire_past_moments()` - Batch expiry for cron job
-
-### Environment Variable Handling
-The Express server injects secrets into HTML via `window.ENV` object. This approach avoids VITE_ prefixes and works seamlessly with Replit Secrets.
-
-## External Dependencies
-
-### Third-Party Services
-| Service | Purpose | Configuration |
-|---------|---------|---------------|
-| **Supabase** | Database, Auth, Realtime, Edge Functions | `SUPABASE_URL`, `SUPABASE_ANON_KEY` |
-| **Mapbox** | Map tiles and GL JS library | `MAPBOX_TOKEN` |
-| **Replit** | Hosting platform | Automatic via `.replit` config |
-| **GoodBarber** | Mobile app wrapper (WebView embedding) | Manual URL configuration |
-
-### NPM Dependencies
-- `express@^4.18.2` - Web server for static file serving and env injection
-
-### Edge Functions (Supabase)
-- `expire-moments` - Cron job (every 5 min) to expire past moments
-- `moderate-moment` - Optional auto-moderation on moment creation
-
-### Required Supabase Extensions
-- `postgis` - Geospatial queries
-- `pg_trgm` - Text search optimization
+## Notes
+- The app requires a MAPBOX_TOKEN to display the map
+- User passwords are hashed with bcrypt
+- Sessions are stored in PostgreSQL for persistence
+- Photos are stored locally in the /uploads directory

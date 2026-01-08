@@ -1,66 +1,282 @@
-// ============================================================================
-// Supabase Client Configuration
-// ============================================================================
-
-// Environment variables (set in Replit Secrets)
-// Replit injects secrets as window.ENV object
-const SUPABASE_URL = window.ENV?.SUPABASE_URL || 
-                     'YOUR_SUPABASE_URL';
-
-const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || 
-                          'YOUR_SUPABASE_ANON_KEY';
-
-const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || 
-                     'YOUR_MAPBOX_TOKEN';
-
-// Initialize Supabase client
-export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-});
+const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || 'YOUR_MAPBOX_TOKEN';
 
 export const mapboxToken = MAPBOX_TOKEN;
 
-// Helper: Get current user
 export async function getCurrentUser() {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error) {
+  try {
+    const response = await fetch('/api/auth/user', { credentials: 'include' });
+    const data = await response.json();
+    return data.user;
+  } catch (error) {
     console.error('Error getting user:', error);
     return null;
   }
-  return user;
 }
 
-// Helper: Get user profile
-export async function getUserProfile(userId) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+export async function getSession() {
+  try {
+    const response = await fetch('/api/auth/user', { credentials: 'include' });
+    const data = await response.json();
+    return { user: data.user, profile: data.profile, needsProfile: data.needsProfile };
+  } catch (error) {
+    console.error('Error getting session:', error);
+    return { user: null, profile: null, needsProfile: false };
+  }
+}
 
-  if (error) {
+export async function login(email, password) {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Login failed');
+  }
+  return response.json();
+}
+
+export async function register(email, password) {
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Registration failed');
+  }
+  return response.json();
+}
+
+export async function logout() {
+  const response = await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  return response.json();
+}
+
+export async function getUserProfile(userId) {
+  try {
+    const response = await fetch(`/api/profiles/${userId}`, { credentials: 'include' });
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
     console.error('Error fetching profile:', error);
     return null;
   }
-  return data;
 }
 
-// Helper: Check if profile exists
+export async function createProfile(data) {
+  const response = await fetch('/api/profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create profile');
+  }
+  return response.json();
+}
+
 export async function checkProfileExists(userId) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', userId)
-    .maybeSingle();
-
-  return !!data && !error;
+  try {
+    const response = await fetch(`/api/profiles/${userId}`, { credentials: 'include' });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
 }
 
-// Helper: Format time
+export async function getNearbyMoments(lat, lng, radius = 5000, limit = 50) {
+  const response = await fetch(
+    `/api/moments/nearby?lat=${lat}&lng=${lng}&radius=${radius}&limit=${limit}`,
+    { credentials: 'include' }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch moments');
+  }
+  return response.json();
+}
+
+export async function searchMoments(query, lat, lng, radius = 10000, limit = 20) {
+  const response = await fetch(
+    `/api/moments/search?q=${encodeURIComponent(query)}&lat=${lat}&lng=${lng}&radius=${radius}&limit=${limit}`,
+    { credentials: 'include' }
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Search failed');
+  }
+  return response.json();
+}
+
+export async function getMoment(id) {
+  const response = await fetch(`/api/moments/${id}`, { credentials: 'include' });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch moment');
+  }
+  return response.json();
+}
+
+export async function createMoment(data) {
+  const response = await fetch('/api/moments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create moment');
+  }
+  return response.json();
+}
+
+export async function getMomentContext(momentId) {
+  const response = await fetch(`/api/moments/${momentId}/context`, { credentials: 'include' });
+  if (!response.ok) return { participant_count: 0, badges: [] };
+  return response.json();
+}
+
+export async function joinMoment(momentId) {
+  const response = await fetch(`/api/moments/${momentId}/join`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to join moment');
+  }
+  return response.json();
+}
+
+export async function leaveMoment(momentId) {
+  const response = await fetch(`/api/moments/${momentId}/leave`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to leave moment');
+  }
+  return response.json();
+}
+
+export async function getParticipants(momentId) {
+  const response = await fetch(`/api/moments/${momentId}/participants`, { credentials: 'include' });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function isParticipant(momentId) {
+  const response = await fetch(`/api/moments/${momentId}/participation`, { credentials: 'include' });
+  if (!response.ok) return false;
+  const data = await response.json();
+  return data.isParticipant;
+}
+
+export async function getMessages(momentId, limit = 100) {
+  const response = await fetch(`/api/moments/${momentId}/messages?limit=${limit}`, { credentials: 'include' });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function sendMessage(momentId, content) {
+  const response = await fetch(`/api/moments/${momentId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ content }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to send message');
+  }
+  return response.json();
+}
+
+export async function getMomentPhotos(momentId, isPreview = true) {
+  const response = await fetch(`/api/moments/${momentId}/photos?preview=${isPreview}`, { credentials: 'include' });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function uploadMomentPhoto(momentId, file, isPreview = false) {
+  const formData = new FormData();
+  formData.append('photo', file);
+  formData.append('isPreview', isPreview.toString());
+  
+  const response = await fetch(`/api/moments/${momentId}/photos`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to upload photo');
+  }
+  return response.json();
+}
+
+export async function uploadAvatar(file) {
+  const formData = new FormData();
+  formData.append('photo', file);
+  
+  const response = await fetch('/api/upload/avatar', {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to upload avatar');
+  }
+  return response.json();
+}
+
+export async function getSosAlerts() {
+  const response = await fetch('/api/sos-alerts', { credentials: 'include' });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function createSosAlert(momentId, lat, lng) {
+  const response = await fetch('/api/sos-alerts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ momentId, lat, lng }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create SOS alert');
+  }
+  return response.json();
+}
+
+export async function createFlag(targetType, targetId, reason) {
+  const response = await fetch('/api/flags', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ targetType, targetId, reason }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create flag');
+  }
+  return response.json();
+}
+
 export function formatTime(timestamp) {
   const date = new Date(timestamp);
   const now = new Date();
@@ -77,7 +293,6 @@ export function formatTime(timestamp) {
   return date.toLocaleDateString();
 }
 
-// Helper: Format datetime for display
 export function formatDateTime(timestamp) {
   const date = new Date(timestamp);
   const today = new Date();
@@ -105,7 +320,6 @@ export function formatDateTime(timestamp) {
   }
 }
 
-// Helper: Show toast notification
 export function showToast(message, type = 'info') {
   const existingToast = document.querySelector('.toast');
   if (existingToast) {
@@ -139,7 +353,6 @@ export function showToast(message, type = 'info') {
   }, 3000);
 }
 
-// Add animation styles
 const style = document.createElement('style');
 style.textContent = `
   @keyframes slideUp {
@@ -164,4 +377,3 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
-
