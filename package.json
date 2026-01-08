@@ -1,0 +1,23 @@
+{
+  "name": "moments-mvp",
+  "version": "1.0.0",
+  "description": "Spontaneous social moments discovery app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "social",
+    "moments",
+    "geospatial",
+    "supabase",
+    "replit"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
+

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Moment Details</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <button id="backBtn" class="btn-back">← Back</button>
+      <h1 class="logo">Moment</h1>
+      <button id="flagBtn" class="btn-flag">🚩</button>
+    </header>
+
+    <!-- Moment Details -->
+    <main class="moment-detail">
+      <div id="loader" class="loader">
+        <div class="spinner"></div>
+      </div>
+
+      <div id="momentContent" class="hidden">
+        <!-- Preview Photos -->
+        <div id="previewPhotosSection" class="preview-photos-section hidden">
+          <div id="previewPhotos" class="preview-photos"></div>
+        </div>
+
+        <!-- Moment Info -->
+        <div class="moment-header">
+          <h2 id="momentTitle"></h2>
+          <div class="badges" id="contextBadges"></div>
+        </div>
+
+        <div class="moment-info">
+          <div class="info-row">
+            <span class="icon">📍</span>
+            <span id="momentLocation"></span>
+          </div>
+          <div class="info-row">
+            <span class="icon">🕐</span>
+            <span id="momentTime"></span>
+          </div>
+          <div class="info-row">
+            <span class="icon">👥</span>
+            <span id="participantCount"></span>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button id="joinBtn" class="btn-primary hidden">Join Moment</button>
+          <button id="leaveBtn" class="btn-secondary hidden">Leave Moment</button>
+          <button id="chatBtn" class="btn-primary hidden">Open Chat</button>
+        </div>
+
+        <!-- Participants List -->
+        <div class="participants-section">
+          <h3>Participants</h3>
+          <div id="participantsList" class="participants-list"></div>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div id="errorState" class="error-state hidden">
+        <p id="errorMessage"></p>
+        <button onclick="history.back()" class="btn-secondary">Go Back</button>
+      </div>
+    </main>
+
+    <!-- Flag Modal -->
+    <div id="flagModal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-btn" id="closeFlagModal">&times;</button>
+        <h2>Report Moment</h2>
+        <form id="flagForm">
+          <label>Reason:</label>
+          <select id="flagReason" required>
+            <option value="">Select a reason</option>
+            <option value="spam">Spam</option>
+            <option value="inappropriate">Inappropriate content</option>
+            <option value="harassment">Harassment</option>
+            <option value="other">Other</option>
+          </select>
+          <button type="submit" class="btn-primary">Submit Report</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/config.js"></script>
+  <script type="module" src="js/moment.js"></script>
+</body>
+</html>
+
