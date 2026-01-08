@@ -56,14 +56,34 @@ async function checkAuthStatus() {
   
   try {
     // Check for auth callback with timeout
-    const sessionResult = await Promise.race([
-      supabase.auth.getSession(),
-      timeoutPromise
-    ]);
+    let sessionResult;
+    try {
+      sessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        timeoutPromise
+      ]);
+    } catch (sessionError) {
+      console.error('Session error:', sessionError);
+      // If session check fails (e.g. "signal aborted"), try to reload without hash
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        console.log('Clearing auth hash and retrying...');
+        window.history.replaceState(null, '', window.location.pathname);
+        sessionResult = await supabase.auth.getSession();
+      } else {
+        throw sessionError;
+      }
+    }
     
     const { data: { session }, error } = sessionResult;
     
     if (error) {
+      console.error('Auth error:', error);
+      // If auth error related to token, clear and retry
+      if (error.message.includes('signal') || error.message.includes('aborted')) {
+        window.history.replaceState(null, '', window.location.pathname);
+        window.location.reload();
+        return;
+      }
       throw new Error('Authentication error: ' + error.message);
     }
     
