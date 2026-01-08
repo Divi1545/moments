@@ -946,6 +946,7 @@ function setupCreateMomentButton() {
       // Create moment first
       const { data, error } = await supabase.from('moments').insert({
         title,
+        creator_id: currentUser.id,
         location: `POINT(${selectedLocation[0]} ${selectedLocation[1]})`,
         lat: selectedLocation[1],
         lng: selectedLocation[0],
