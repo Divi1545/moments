@@ -18,7 +18,7 @@ export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,  // We handle this manually to avoid AbortError
   },
 });
 
