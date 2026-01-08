@@ -49,59 +49,61 @@ async function initAuth() {
 async function checkAuthStatus() {
   const loader = document.getElementById('loader');
   
+  // Extract tokens from URL hash BEFORE any Supabase calls
+  let accessToken = null;
+  let refreshToken = null;
+  
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    console.log('Found auth tokens in URL hash');
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    accessToken = hashParams.get('access_token');
+    refreshToken = hashParams.get('refresh_token');
+    
+    // IMMEDIATELY clear the hash to prevent Supabase from trying to process it
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+  
   try {
-    // Handle auth callback from magic link - parse hash manually if present
-    if (window.location.hash && window.location.hash.includes('access_token')) {
-      console.log('Processing auth callback...');
+    // If we have tokens from the URL, set the session manually
+    if (accessToken && refreshToken) {
+      console.log('Setting session from magic link tokens...');
       
-      // Parse the hash parameters
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
       
-      if (accessToken && refreshToken) {
-        try {
-          // Set the session manually
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-          
-          // Clear the hash from URL
-          window.history.replaceState(null, '', window.location.pathname);
-          
-          if (error) {
-            console.error('Session set error:', error);
-            throw error;
-          }
-          
-          if (data.session) {
-            currentUser = data.session.user;
-            console.log('User logged in via magic link:', currentUser.id);
-            
-            const hasProfile = await checkProfileExists(currentUser.id);
-            if (!hasProfile) {
-              showProfileModal();
-              loader.classList.add('hidden');
-            } else {
-              await initApp();
-              loader.classList.add('hidden');
-            }
-            return;
-          }
-        } catch (tokenError) {
-          console.error('Token processing error:', tokenError);
-          // Clear hash and continue to normal flow
-          window.history.replaceState(null, '', window.location.pathname);
+      if (error) {
+        console.error('Session set error:', error);
+        // Don't throw - try getSession as fallback
+      } else if (data.session) {
+        currentUser = data.session.user;
+        console.log('User logged in via magic link:', currentUser.id);
+        
+        const hasProfile = await checkProfileExists(currentUser.id);
+        if (!hasProfile) {
+          showProfileModal();
+          loader.classList.add('hidden');
+        } else {
+          await initApp();
+          loader.classList.add('hidden');
         }
+        return;
       }
     }
     
-    // Normal session check (no magic link callback)
+    // Normal session check (no magic link callback or token set failed)
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
       console.error('Auth error:', error);
+      // If it's the abort error, we can ignore and show auth modal
+      if (error.message && error.message.includes('abort')) {
+        console.log('Ignoring abort error, showing auth modal');
+        showAuthModal();
+        loader.classList.add('hidden');
+        return;
+      }
       throw new Error('Authentication error: ' + error.message);
     }
     

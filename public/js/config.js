@@ -4,23 +4,35 @@
 
 // Environment variables (set in Replit Secrets)
 // Replit injects secrets as window.ENV object
-const SUPABASE_URL = window.ENV?.SUPABASE_URL || 
-                     'YOUR_SUPABASE_URL';
+const SUPABASE_URL = window.ENV?.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || '';
+const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || '';
 
-const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || 
-                          'YOUR_SUPABASE_ANON_KEY';
+// Debug: Log environment status
+console.log('Supabase URL set:', !!SUPABASE_URL && SUPABASE_URL !== 'YOUR_SUPABASE_URL');
+console.log('Supabase Key set:', !!SUPABASE_ANON_KEY && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY');
 
-const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || 
-                     'YOUR_MAPBOX_TOKEN';
+// Validate required environment variables
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('Missing Supabase environment variables!');
+  throw new Error('Configuration error: Missing Supabase credentials');
+}
 
-// Initialize Supabase client
-export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Initialize Supabase client with proper settings
+const { createClient } = window.supabase;
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,  // We handle this manually to avoid AbortError
+    detectSessionInUrl: false,
+    flowType: 'implicit',
+    storage: window.localStorage,
+    storageKey: 'moments-auth',
   },
 });
+
+console.log('Supabase client initialized successfully');
 
 export const mapboxToken = MAPBOX_TOKEN;
 
