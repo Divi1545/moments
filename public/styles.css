@@ -1511,3 +1511,251 @@ label {
   }
 }
 
+/* ============================================================================
+   Mobile-Specific Optimizations (Small Screens)
+   ============================================================================ */
+
+/* Small phones (320px - 375px) */
+@media (max-width: 375px) {
+  .modal-content {
+    padding: 18px;
+    max-width: calc(100vw - 32px);
+  }
+  
+  .modal-content h2 {
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="datetime-local"],
+  select,
+  textarea {
+    padding: 11px 13px;
+    font-size: 14px;
+  }
+  
+  .btn-primary, .btn-secondary {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+  
+  .header {
+    padding: 12px 16px;
+    min-height: 54px;
+  }
+  
+  .logo {
+    font-size: 18px;
+  }
+  
+  .welcome-title {
+    font-size: 36px;
+  }
+  
+  .welcome-subtitle {
+    font-size: 15px;
+  }
+  
+  .welcome-icon {
+    font-size: 60px;
+  }
+  
+  .welcome-content {
+    padding: 24px 20px;
+  }
+  
+  .btn-large {
+    padding: 14px 32px;
+    font-size: 16px;
+  }
+  
+  .moment-header h2 {
+    font-size: 22px;
+  }
+  
+  .moment-info {
+    padding: 16px;
+  }
+  
+  .info-row {
+    font-size: 14px;
+  }
+  
+  .message-bubble {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  
+  .chat-footer {
+    padding: 12px 14px;
+  }
+  
+  .checkbox-group {
+    grid-template-columns: 1fr;
+    max-height: 180px;
+  }
+  
+  .participant-item {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .participant-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .mapboxgl-popup-content {
+    padding: 12px;
+    max-width: calc(100vw - 60px);
+  }
+  
+  .mapboxgl-popup-content h3 {
+    font-size: 15px;
+  }
+  
+  .mapboxgl-popup-content p {
+    font-size: 13px;
+  }
+  
+  .otp-input {
+    font-size: 24px;
+    letter-spacing: 6px;
+    padding: 14px;
+  }
+}
+
+/* Very small screens (below 320px) */
+@media (max-width: 320px) {
+  .modal-content {
+    padding: 16px;
+  }
+  
+  .modal-content h2 {
+    font-size: 18px;
+  }
+  
+  input, select, textarea {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+  
+  .btn-primary, .btn-secondary {
+    padding: 9px 18px;
+    font-size: 13px;
+  }
+  
+  .welcome-title {
+    font-size: 32px;
+  }
+  
+  .welcome-icon {
+    font-size: 50px;
+  }
+  
+  .otp-input {
+    font-size: 20px;
+    letter-spacing: 4px;
+    padding: 12px;
+  }
+}
+
+/* Landscape mode fixes */
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-content {
+    max-height: 85vh;
+    padding: 16px;
+  }
+  
+  .welcome-content {
+    padding: 20px;
+  }
+  
+  .welcome-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+  
+  .welcome-title {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+  
+  .welcome-subtitle {
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+}
+
+/* Touch target minimum sizes (44px for accessibility) */
+.btn-primary,
+.btn-secondary,
+.btn-send,
+.btn-back,
+.btn-danger,
+.btn-small,
+.btn-upload-image {
+  min-height: 44px;
+}
+
+.close-btn,
+.clear-search-btn {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon,
+.btn-flag,
+.message-flag-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mapboxgl-popup-close-button {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Header text overflow fix */
+.chat-header-info h2 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+#myMomentsBtn {
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+@media (max-width: 400px) {
+  #myMomentsBtn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  #createMomentBtn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  .search-input {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+}
+
