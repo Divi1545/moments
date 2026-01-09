@@ -48,29 +48,35 @@ async function initAuth() {
   });
 }
 
+// Register auth state change listener ONCE at module level
+let authListenerRegistered = false;
+
 async function checkAuthStatus() {
   const loader = document.getElementById('loader');
   
-  // Listen for auth changes first
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth state changed:', event);
-    
-    if (event === 'SIGNED_IN' && session) {
-      currentUser = session.user;
-      const hasProfile = await checkProfileExists(currentUser.id);
+  // Register listener only once
+  if (!authListenerRegistered) {
+    authListenerRegistered = true;
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
       
-      if (!hasProfile) {
-        showProfileModal();
-      } else {
-        showToast('Welcome back!', 'success');
-        await initApp();
-        loader.classList.add('hidden');
+      if (event === 'SIGNED_IN' && session) {
+        currentUser = session.user;
+        const hasProfile = await checkProfileExists(currentUser.id);
+        
+        if (!hasProfile) {
+          showProfileModal();
+        } else {
+          showToast('Welcome back!', 'success');
+          await initApp();
+          loader.classList.add('hidden');
+        }
+      } else if (event === 'SIGNED_OUT') {
+        showToast('Signed out', 'info');
+        window.location.reload();
       }
-    } else if (event === 'SIGNED_OUT') {
-      showToast('Signed out', 'info');
-      window.location.reload();
-    }
-  });
+    });
+  }
   
   try {
     // Let Supabase handle auth automatically - just check current session
@@ -108,55 +114,183 @@ async function checkAuthStatus() {
   }
 }
 
-// Show auth modal
+// Show auth modal with OTP flow
+let authPendingEmail = '';
+
 function showAuthModal() {
   const modal = document.getElementById('authModal');
   modal.classList.remove('hidden');
 
-  const form = document.getElementById('authForm');
+  const emailStep = document.getElementById('emailStep');
+  const otpStep = document.getElementById('otpStep');
+  const emailInput = document.getElementById('email');
+  const otpInput = document.getElementById('otpCode');
   const message = document.getElementById('authMessage');
   
-  // Remove previous listeners to prevent duplicates
-  const newForm = form.cloneNode(true);
-  form.parentNode.replaceChild(newForm, form);
+  // Reset state when modal opens
+  authPendingEmail = '';
+  emailInput.value = '';
+  otpInput.value = '';
   
-  const updatedMessage = document.getElementById('authMessage');
+  // Get fresh button references
+  let sendBtn = document.getElementById('sendCodeBtn');
+  let verifyBtn = document.getElementById('verifyCodeBtn');
+  let resendBtn = document.getElementById('resendCodeBtn');
+  
+  // Clone buttons to remove old handlers
+  const newSendBtn = sendBtn.cloneNode(true);
+  const newVerifyBtn = verifyBtn.cloneNode(true);
+  const newResendBtn = resendBtn.cloneNode(true);
+  sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
+  verifyBtn.parentNode.replaceChild(newVerifyBtn, verifyBtn);
+  resendBtn.parentNode.replaceChild(newResendBtn, resendBtn);
 
-  newForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
+  // Reset form handler
+  const form = document.getElementById('authForm');
+  form.onsubmit = null;
+
+  // Reset to email step
+  emailStep.classList.remove('hidden');
+  otpStep.classList.add('hidden');
+  message.textContent = '';
+
+  // Send OTP code
+  async function sendOtpCode() {
+    const email = emailInput.value.trim();
+    const btn = document.getElementById('sendCodeBtn');
     
     if (!email || !email.includes('@')) {
-      updatedMessage.textContent = 'Please enter a valid email address';
-      updatedMessage.style.color = 'var(--danger)';
+      message.textContent = 'Please enter a valid email address';
+      message.style.color = 'var(--danger)';
       return;
     }
 
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending...';
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.origin,
-        },
+          shouldCreateUser: true
+        }
       });
 
       if (error) throw error;
 
-      updatedMessage.textContent = '✅ Check your email for the magic link!';
-      updatedMessage.style.color = 'var(--success)';
-      newForm.reset();
+      authPendingEmail = email;
+      emailStep.classList.add('hidden');
+      otpStep.classList.remove('hidden');
+      message.textContent = '✅ Check your email for your 6-digit code!';
+      message.style.color = 'var(--success)';
+      otpInput.value = '';
+      otpInput.focus();
     } catch (error) {
-      updatedMessage.textContent = 'Error: ' + error.message;
-      updatedMessage.style.color = 'var(--danger)';
+      if (error.message?.includes('rate') || error.message?.includes('limit')) {
+        message.textContent = 'Please wait a moment before requesting another code.';
+      } else {
+        message.textContent = 'Error: ' + error.message;
+      }
+      message.style.color = 'var(--danger)';
     } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Send Magic Link';
+      btn.disabled = false;
+      btn.textContent = 'Send Code';
     }
-  });
+  }
+
+  // Verify OTP code
+  async function verifyOtpCode() {
+    const otpCode = otpInput.value.trim();
+    const btn = document.getElementById('verifyCodeBtn');
+    
+    if (!otpCode || otpCode.length !== 6 || !/^\d{6}$/.test(otpCode)) {
+      message.textContent = 'Please enter a valid 6-digit code';
+      message.style.color = 'var(--danger)';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: authPendingEmail,
+        token: otpCode,
+        type: 'email'
+      });
+
+      if (error) throw error;
+
+      message.textContent = '✅ Success! Signing you in...';
+      message.style.color = 'var(--success)';
+      
+      // The onAuthStateChange listener registered in checkAuthStatus() will handle the rest
+      modal.classList.add('hidden');
+    } catch (error) {
+      message.textContent = 'Invalid or expired code. Please try again.';
+      message.style.color = 'var(--danger)';
+      otpInput.value = '';
+      otpInput.focus();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Verify Code';
+    }
+  }
+
+  // Resend OTP code
+  async function resendOtpCode() {
+    const btn = document.getElementById('resendCodeBtn');
+    
+    if (!authPendingEmail) {
+      otpStep.classList.add('hidden');
+      emailStep.classList.remove('hidden');
+      message.textContent = '';
+      emailInput.focus();
+      return;
+    }
+    
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: authPendingEmail,
+        options: {
+          shouldCreateUser: true
+        }
+      });
+
+      if (error) throw error;
+
+      message.textContent = '✅ New code sent! Check your email.';
+      message.style.color = 'var(--success)';
+      otpInput.value = '';
+      otpInput.focus();
+    } catch (error) {
+      if (error.message?.includes('rate') || error.message?.includes('limit')) {
+        message.textContent = 'Please wait a moment before requesting another code.';
+      } else {
+        message.textContent = 'Error: ' + error.message;
+      }
+      message.style.color = 'var(--danger)';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Resend Code';
+    }
+  }
+
+  // Event listeners
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    if (!otpStep.classList.contains('hidden')) {
+      verifyOtpCode();
+    } else {
+      sendOtpCode();
+    }
+  };
+
+  newVerifyBtn.onclick = verifyOtpCode;
+  newResendBtn.onclick = resendOtpCode;
 }
 
 // Show profile setup modal

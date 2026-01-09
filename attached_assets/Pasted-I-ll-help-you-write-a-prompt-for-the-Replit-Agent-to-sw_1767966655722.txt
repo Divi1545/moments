@@ -1,0 +1,143 @@
+I'll help you write a prompt for the Replit Agent to switch from magic link authentication to OTP (One-Time Password) authentication. Let me first check your current setup to make better recommendations.
+
+[6 tools called]
+
+Based on your codebase, I'll write a comprehensive prompt for the Replit Agent to implement OTP authentication instead of magic link. Here's the prompt:
+
+---
+
+## Prompt for Replit Agent: Switch from Magic Link to OTP Authentication
+
+**Context:**
+Our Moments app currently uses Supabase magic link authentication (passwordless email). However, when users click the magic link on mobile devices within the GoodBarber WebView, it opens in an external browser and takes them out of the app, creating a poor user experience. We need to switch to OTP (One-Time Password) authentication where users receive a 6-digit code via email and type it directly in the app.
+
+**What you need to do:**
+
+### 1. Update Authentication Flow in `public/js/map.js`
+
+**Current flow (lines 147-167):**
+- User enters email
+- App calls `supabase.auth.signInWithOtp()` with `emailRedirectTo`
+- User clicks magic link in email
+- Problem: Opens external browser
+
+**New flow needed:**
+- User enters email
+- App calls `supabase.auth.signInWithOtp()` with `shouldCreateUser: true` (NO `emailRedirectTo`)
+- User receives 6-digit OTP code in email
+- App shows new input field for OTP code
+- User types in the OTP code
+- App calls `supabase.auth.verifyOtp()` to complete sign-in
+- If verification succeeds, proceed as normal
+
+### 2. Update UI in `public/index.html`
+
+**Current auth modal (lines 40-51):**
+```html
+<div id="authModal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Welcome to Moments</h2>
+    <p>Discover spontaneous gatherings nearby</p>
+    <form id="authForm">
+      <input type="email" id="email" placeholder="Enter your email" required>
+      <button type="submit" class="btn-primary">Send Magic Link</button>
+    </form>
+    <p class="auth-message" id="authMessage"></p>
+  </div>
+</div>
+```
+
+**Update to:**
+- Add new input field for OTP code (initially hidden)
+- Change button text from "Send Magic Link" to "Send Code"
+- Add second button "Verify Code" (initially hidden)
+- Show/hide appropriate elements based on state (email entry vs OTP entry)
+
+### 3. Implementation Details
+
+**Step 1 - Send OTP:**
+```javascript
+const { error } = await supabase.auth.signInWithOtp({
+  email,
+  options: {
+    shouldCreateUser: true
+  }
+});
+```
+
+**Step 2 - Verify OTP:**
+```javascript
+const { data, error } = await supabase.auth.verifyOtp({
+  email,
+  token: otpCode, // 6-digit code user typed
+  type: 'email'
+});
+```
+
+### 4. Update User Messages
+
+Replace all instances of:
+- "Send Magic Link" → "Send Code"
+- "Check your email for the magic link!" → "Check your email for your 6-digit code!"
+- Any other magic link references
+
+### 5. Files to Update
+
+1. **`public/js/map.js`** (lines 130-167):
+   - Update `showAuthModal()` function
+   - Change OTP sending logic
+   - Add OTP verification logic
+   - Handle two-step form flow
+
+2. **`public/index.html`** (lines 40-51):
+   - Add OTP input field
+   - Add verify button
+   - Update button text
+
+3. **`public/styles.css`** (if needed):
+   - Style OTP input field (large, centered digits)
+   - Add appropriate spacing
+
+### 6. Error Handling
+
+Handle these cases:
+- Invalid or expired OTP code
+- Network errors during verification
+- User requests resend code
+
+### 7. Testing Checklist
+
+After implementation, test:
+- [ ] Enter email → Receive code in email
+- [ ] Enter correct 6-digit code → Successfully sign in
+- [ ] Enter wrong code → Show error message
+- [ ] Resend code functionality works
+- [ ] No external browser redirects occur
+- [ ] Works in GoodBarber WebView on iOS/Android
+
+### 8. Documentation Updates
+
+Update these files to reflect OTP authentication:
+- `DEPLOYMENT.md` (line 283)
+- `PROJECT_SUMMARY.md` (lines 63, 103, 280)
+- `GOODBARBER.md` (lines 100, 135, 256-257)
+- `FIXES_APPLIED.md` (lines 103-104, 131-132)
+- `replit.md` (line 35)
+
+Replace all "magic link" references with "OTP code" or "6-digit code"
+
+---
+
+**Important Notes:**
+- Supabase already supports this! Just change the API calls
+- No backend changes needed - this is frontend only
+- Keep all existing profile setup flow after successful auth
+- Maintain all security features (RLS policies, etc.)
+- I've already updated Supabase configuration to support OTP
+
+**Expected Result:**
+Users stay within the app throughout the entire authentication process. They receive an email with a 6-digit code, type it in the app, and get signed in without ever leaving the GoodBarber WebView.
+
+---
+
+Copy this entire prompt and paste it into Replit Agent. It has all the context and specific instructions needed to complete the task!

@@ -54,8 +54,16 @@
         <h2>Welcome to Moments</h2>
         <p>Discover spontaneous gatherings nearby</p>
         <form id="authForm">
-          <input type="email" id="email" placeholder="Enter your email" required>
-          <button type="submit" class="btn-primary">Send Magic Link</button>
+          <div id="emailStep">
+            <input type="email" id="email" placeholder="Enter your email" required>
+            <button type="submit" class="btn-primary" id="sendCodeBtn">Send Code</button>
+          </div>
+          <div id="otpStep" class="hidden">
+            <p class="otp-instruction">Enter the 6-digit code sent to your email</p>
+            <input type="text" id="otpCode" placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" class="otp-input">
+            <button type="button" class="btn-primary" id="verifyCodeBtn">Verify Code</button>
+            <button type="button" class="btn-secondary" id="resendCodeBtn">Resend Code</button>
+          </div>
         </form>
         <p class="auth-message" id="authMessage"></p>
       </div>

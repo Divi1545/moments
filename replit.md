@@ -73,5 +73,5 @@ node server.js
 ## Notes
 - Uses Supabase Realtime for live chat updates
 - Uses Supabase Storage for photo uploads
-- Uses Supabase Auth with magic links
+- Uses Supabase Auth with OTP (6-digit email codes) for in-app authentication
 - Express.js only serves static files and injects environment variables

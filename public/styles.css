@@ -730,6 +730,39 @@ label {
   margin-top: 8px;
 }
 
+.otp-instruction {
+  text-align: center;
+  color: var(--text);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.otp-input {
+  font-size: 28px;
+  text-align: center;
+  letter-spacing: 8px;
+  font-weight: 700;
+  padding: 16px;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+}
+
+.otp-input::placeholder {
+  letter-spacing: 8px;
+  color: var(--text-light);
+  opacity: 0.5;
+}
+
+#otpStep .btn-secondary {
+  margin-top: 8px;
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+#otpStep .btn-secondary:hover {
+  background: rgba(255, 107, 138, 0.1);
+}
+
 /* ============================================================================
    Moment Detail Page
    ============================================================================ */
