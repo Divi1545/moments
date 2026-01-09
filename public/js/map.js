@@ -37,7 +37,18 @@ async function initAuth() {
   const welcomeScreen = document.getElementById('welcomeScreen');
   const loader = document.getElementById('loader');
   
-  // Show welcome screen
+  // First check if user is already logged in - skip welcome screen if so
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session) {
+    // User is logged in, skip welcome screen and go directly to map
+    welcomeScreen.classList.add('hidden');
+    loader.classList.remove('hidden');
+    checkAuthStatus();
+    return;
+  }
+  
+  // Show welcome screen only for new/logged out users
   welcomeScreen.classList.remove('hidden');
   
   // Set up get started button
