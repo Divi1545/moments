@@ -888,6 +888,12 @@ function setupCreateMomentButton() {
 
       const momentId = data.id;
 
+      // Auto-join creator as participant
+      await supabase.from('moment_participants').insert({
+        moment_id: momentId,
+        user_id: currentUser.id
+      });
+
       // Upload preview photo if selected
       if (selectedMomentPhoto) {
         submitBtn.textContent = 'Uploading photo...';

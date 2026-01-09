@@ -1,0 +1,96 @@
+CRITICAL: Chat messages don't send or display
+
+The console shows:
+- 400 error when calling get_moment_context
+- "0 participants" in header
+- Messages don't appear when typing and pressing Send
+
+ROOT CAUSE: User is NOT a participant in the moment, so RLS blocks message sending.
+
+FIX THIS NOW:
+
+1. CHECK IF AUTO-JOIN TRIGGER WORKS
+   - When a moment is created, the creator should auto-join as participant
+   - Verify the trigger exists in Supabase:
+     Database → Functions → "auto_join_creator"
+   - Verify trigger fires on moments table INSERT
+   
+2. FIX MOMENT DETAIL PAGE
+   - In public/js/moment.js, when user opens the moment detail page:
+   - Check if they're a participant
+   - If NOT, show "Join Moment" button prominently
+   - User MUST join before accessing chat
+   
+3. FIX CHAT PAGE ACCESS
+   - In public/js/chat.js, at the start:
+   
+   // Check if user is participant
+   const { data: participation } = await supabase
+     .from('moment_participants')
+     .select('id')
+     .eq('moment_id', momentId)
+     .eq('user_id', currentUser.id)
+     .maybeSingle();
+   
+   if (!participation) {
+     // Auto-join them
+     await supabase.from('moment_participants').insert({
+       moment_id: momentId,
+       user_id: currentUser.id
+     });
+   }
+   
+4. FIX MESSAGE SENDING
+   - In public/js/chat.js, when form submits:
+   
+   const { data, error } = await supabase
+     .from('moment_messages')
+     .insert({
+       moment_id: momentId,
+       user_id: currentUser.id,
+       content: messageText.trim()
+     })
+     .select('*, profiles!user_id(display_name, profile_photo_url)')
+     .single();
+   
+   if (error) {
+     console.error('Error sending message:', error);
+     showToast('Failed to send message: ' + error.message, 'error');
+     return;
+   }
+   
+   // Message sent successfully - it will appear via realtime subscription
+
+5. FIX REALTIME SUBSCRIPTION
+   - Make sure you're subscribed to new messages:
+   
+   const channel = supabase
+     .channel(`moment-${momentId}`)
+     .on('postgres_changes', {
+       event: 'INSERT',
+       schema: 'public',
+       table: 'moment_messages',
+       filter: `moment_id=eq.${momentId}`
+     }, (payload) => {
+       appendMessage(payload.new);
+     })
+     .subscribe();
+
+6. UPDATE PARTICIPANT COUNT
+   - After joining, reload the participant count in header
+   - Call: await loadMomentInfo() to refresh header
+
+MOST IMPORTANT:
+- User MUST be a participant before sending messages
+- Either auto-join them or show "Join" button clearly
+- Then messages will send and display
+
+Test:
+1. Create a moment ✓
+2. Go to moment detail ✓
+3. Click "Join Moment" ✓
+4. Go to chat ✓
+5. Type message and press Send ✓
+6. Message appears instantly ✓
+
+Fix these issues in order and test each step.

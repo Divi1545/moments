@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Verify user is a participant
+  // Auto-join user as participant if not already joined
   const { data: participation } = await supabase
     .from('moment_participants')
     .select('id')
@@ -36,8 +36,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     .maybeSingle();
 
   if (!participation) {
-    showError('You must join the moment to access chat');
-    return;
+    const { error: joinError } = await supabase
+      .from('moment_participants')
+      .insert({
+        moment_id: momentId,
+        user_id: currentUser.id
+      });
+    
+    if (joinError) {
+      console.error('Error joining moment:', joinError);
+      showError('Could not join moment: ' + joinError.message);
+      return;
+    }
   }
 
   await loadMoment();
@@ -66,13 +76,14 @@ async function loadMoment() {
 
   document.getElementById('momentTitle').textContent = moment.title;
 
-  // Get participant count
-  const { data: context } = await supabase.rpc('get_moment_context', {
-    moment_uuid: momentId,
-  });
+  // Get participant count directly
+  const { count, error: countError } = await supabase
+    .from('moment_participants')
+    .select('*', { count: 'exact', head: true })
+    .eq('moment_id', momentId);
 
   document.getElementById('participantCount').textContent = 
-    `${context?.participant_count || 0} participants`;
+    `${count || 0} participants`;
 }
 
 async function loadMessages() {
@@ -343,15 +354,31 @@ function setupEventListeners() {
       // Send message (either text or image URL)
       const messageContent = photoUrl ? `[IMAGE]${photoUrl}` : content;
       
-      const { error } = await supabase
+      const { data: newMessage, error } = await supabase
         .from('moment_messages')
         .insert({
           moment_id: momentId,
           user_id: currentUser.id,
           content: messageContent,
-        });
+        })
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          profiles:user_id (
+            display_name,
+            profile_photo_url
+          )
+        `)
+        .single();
 
       if (error) throw error;
+
+      // Display the sent message immediately
+      if (newMessage) {
+        appendMessage(newMessage, true);
+      }
 
       // Clear image selection
       if (selectedChatImage) {
