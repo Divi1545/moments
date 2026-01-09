@@ -73,5 +73,12 @@ node server.js
 ## Notes
 - Uses Supabase Realtime for live chat updates
 - Uses Supabase Storage for photo uploads
-- Uses Supabase Auth with OTP (6-digit email codes) for in-app authentication
+- Uses Supabase Auth with OTP (8-digit email codes) for in-app authentication
 - Express.js only serves static files and injects environment variables
+
+## Android WebView Compatibility
+The app includes specific fixes for Android devices and GoodBarber WebView:
+- Android-specific meta tags (X-UA-Compatible, HandheldFriendly, MobileOptimized)
+- All asset paths use absolute URLs (leading slashes)
+- Server headers include CORS, X-Frame-Options: ALLOWALL, and cache control
+- CSS includes Android touch and scrolling optimizations
