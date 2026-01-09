@@ -1,0 +1,178 @@
+MULTIPLE CRITICAL ISSUES TO FIX:
+
+1. CREATE MODAL BLOCKS MAP - CAN'T SELECT LOCATION
+   
+   PROBLEM: When create modal is open, it covers the map so user can't click to select location.
+   
+   SOLUTION: Implement this UX flow:
+   
+   Step 1: User clicks "+ Create" button
+   Step 2: Modal opens with form
+   Step 3: When user needs to select location, show:
+           - "📍 Tap the map to select location" message
+           - Button: "Select on Map" or just close modal temporarily
+   Step 4: Modal minimizes/slides down OR closes completely
+   Step 5: User clicks map - location is selected
+   Step 6: Modal reopens automatically with:
+           - All previously entered data SAVED (title, time, participants)
+           - Selected location shown (coordinates or address)
+   
+   IMPLEMENTATION in public/js/map.js:
+   
+   A) Add location selection mode:
+   
+   let isSelectingLocation = false;
+   let tempFormData = {}; // Store form data temporarily
+   
+   B) When "Select on Map" button clicked:
+   
+   document.getElementById('selectLocationBtn').addEventListener('click', () => {
+     // Save current form data
+     tempFormData = {
+       title: document.getElementById('momentTitle').value,
+       startsAt: document.getElementById('startsAt').value,
+       endsAt: document.getElementById('endsAt').value,
+       maxParticipants: document.getElementById('maxParticipants').value
+     };
+     
+     // Hide modal
+     modal.classList.add('hidden');
+     
+     // Enable location selection mode
+     isSelectingLocation = true;
+     map.getCanvas().style.cursor = 'crosshair';
+     showToast('Tap the map to select location', 'info');
+   });
+   
+   C) When map is clicked during selection mode:
+   
+   map.on('click', (e) => {
+     if (isSelectingLocation) {
+       selectedLocation = [e.lngLat.lng, e.lngLat.lat];
+       
+       // Show marker
+       if (selectionMarker) selectionMarker.remove();
+       selectionMarker = new mapboxgl.Marker({ color: '#ff6b8a' })
+         .setLngLat(selectedLocation)
+         .addTo(map);
+       
+       // Reopen modal with saved data
+       modal.classList.remove('hidden');
+       
+       // Restore form data
+       document.getElementById('momentTitle').value = tempFormData.title || '';
+       document.getElementById('startsAt').value = tempFormData.startsAt || '';
+       document.getElementById('endsAt').value = tempFormData.endsAt || '';
+       document.getElementById('maxParticipants').value = tempFormData.maxParticipants || 10;
+       
+       // Show selected location
+       document.getElementById('selectedLocation').textContent = 
+         `📍 ${selectedLocation[1].toFixed(5)}, ${selectedLocation[0].toFixed(5)}`;
+       document.getElementById('selectedLocation').classList.add('selected');
+       
+       // Disable selection mode
+       isSelectingLocation = false;
+       map.getCanvas().style.cursor = '';
+     }
+   });
+   
+   D) Update the HTML in index.html for the modal:
+   
+   Add before the location display:
+   <button type="button" id="selectLocationBtn" class="btn-secondary" style="width: 100%;">
+     📍 Select Location on Map
+   </button>
+   
+   E) Add CSS to make modal less intrusive:
+   
+   When modal is open, make it:
+   - Smaller (max-height: 60vh)
+   - Positioned at top
+   - Scrollable if needed
+   - Semi-transparent background
+   
+2. FIX "TypeError: Failed to fetch" ERROR
+   
+   This error appears when creating a moment. Debug:
+   
+   A) Check Supabase connection in public/js/config.js:
+   
+   console.log('Supabase URL:', window.ENV?.SUPABASE_URL);
+   console.log('Supabase Key:', window.ENV?.SUPABASE_ANON_KEY ? 'Set' : 'Missing');
+   
+   const supabase = createClient(
+     window.ENV?.SUPABASE_URL,
+     window.ENV?.SUPABASE_ANON_KEY
+   );
+   
+   B) Check Replit Secrets are set:
+   - SUPABASE_URL
+   - SUPABASE_ANON_KEY
+   - MAPBOX_TOKEN
+   
+   C) In map.js, when creating moment, log the error:
+   
+   const { data, error } = await supabase.from('moments').insert({
+     creator_id: currentUser.id,
+     title: title,
+     location: `POINT(${selectedLocation[0]} ${selectedLocation[1]})`,
+     lat: selectedLocation[1],
+     lng: selectedLocation[0],
+     starts_at: startsAt,
+     ends_at: endsAt,
+     max_participants: maxParticipants
+   }).select().single();
+   
+   if (error) {
+     console.error('Full error:', error);
+     console.error('Error details:', JSON.stringify(error, null, 2));
+     showToast('Error: ' + error.message, 'error');
+     return;
+   }
+   
+   D) Check if user is authenticated before creating:
+   
+   const { data: { user } } = await supabase.auth.getUser();
+   if (!user) {
+     showToast('You must be logged in to create moments', 'error');
+     return;
+   }
+   
+3. MAKE SURE ENVIRONMENT VARIABLES ARE INJECTED
+   
+   In server.js or index.js, verify this code exists:
+   
+   app.get('*', (req, res, next) => {
+     if (req.path.endsWith('.html') || req.path === '/') {
+       const html = fs.readFileSync('./public/index.html', 'utf-8');
+       const injected = html.replace('</head>', `
+         <script>
+           window.ENV = {
+             SUPABASE_URL: '${process.env.SUPABASE_URL}',
+             SUPABASE_ANON_KEY: '${process.env.SUPABASE_ANON_KEY}',
+             MAPBOX_TOKEN: '${process.env.MAPBOX_TOKEN}'
+           };
+         </script>
+       </head>`);
+       return res.send(injected);
+     }
+     next();
+   });
+
+PRIORITY:
+1. Fix modal UX (select location flow) - HIGHEST
+2. Fix TypeError: Failed to fetch - CRITICAL
+3. Test: Create moment with new flow - VERIFY
+
+Test the complete flow:
+1. Click "+ Create" ✓
+2. Enter title and details ✓
+3. Click "Select Location on Map" ✓
+4. Modal closes, can click map ✓
+5. Click map, location selected ✓
+6. Modal reopens with saved data ✓
+7. Click "Create Moment" ✓
+8. Moment created successfully ✓
+9. Marker appears on map ✓
+
+Fix these issues NOW and report back when done.

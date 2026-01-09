@@ -15,6 +15,8 @@ let selectionMarker = null;
 let searchTimeout = null;
 let currentSearchQuery = '';
 let sosChannel = null;
+let isSelectingLocation = false;
+let tempFormData = {};
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -416,24 +418,19 @@ function createMap(center) {
 
     // Click to select location (for creating moments)
     map.on('click', (e) => {
-      // Only allow location selection when create modal is VISIBLE (not hidden)
-      const createModal = document.getElementById('createModal');
-      if (createModal.classList.contains('hidden')) {
+      // Only allow location selection when in selection mode
+      if (!isSelectingLocation) {
         return;
       }
       
       selectedLocation = [e.lngLat.lng, e.lngLat.lat];
-      const locationDisplay = document.getElementById('selectedLocation');
-      locationDisplay.textContent = 
-        `📍 ${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)}`;
-      locationDisplay.classList.add('selected');
       
       // Remove previous selection marker
       if (selectionMarker) {
         selectionMarker.remove();
       }
       
-      // Add new selection marker with animation
+      // Add new selection marker
       selectionMarker = new mapboxgl.Marker({ 
         color: '#10b981',
         scale: 1.2
@@ -441,10 +438,27 @@ function createMap(center) {
         .setLngLat([e.lngLat.lng, e.lngLat.lat])
         .addTo(map);
       
-      // Remove the selection mode indicator
+      // Exit selection mode
+      isSelectingLocation = false;
+      map.getCanvas().style.cursor = '';
       document.getElementById('map').classList.remove('selection-mode');
       
-      showToast('📍 Location selected! You can tap again to change it.', 'success');
+      // Reopen the create modal
+      const modal = document.getElementById('createModal');
+      modal.classList.remove('hidden');
+      
+      // Restore saved form data
+      if (tempFormData.title) document.getElementById('momentTitle').value = tempFormData.title;
+      if (tempFormData.startsAt) document.getElementById('startsAt').value = tempFormData.startsAt;
+      if (tempFormData.endsAt) document.getElementById('endsAt').value = tempFormData.endsAt;
+      if (tempFormData.maxParticipants) document.getElementById('maxParticipants').value = tempFormData.maxParticipants;
+      
+      // Update location display
+      const locationDisplay = document.getElementById('selectedLocation');
+      locationDisplay.textContent = `📍 ${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)}`;
+      locationDisplay.classList.add('selected');
+      
+      showToast('Location selected!', 'success');
     });
   } catch (error) {
     console.error('Error creating map:', error);
@@ -819,13 +833,13 @@ function setupCreateMomentButton() {
     
     modal.classList.remove('hidden');
     
-    // Enable selection mode on the map
-    document.getElementById('map').classList.add('selection-mode');
-    
-    // Reset location display
+    // Update location display based on whether location is already selected
     const locationDisplay = document.getElementById('selectedLocation');
-    if (!selectedLocation) {
-      locationDisplay.textContent = '👆 Tap the map above to select location';
+    if (selectedLocation) {
+      locationDisplay.textContent = `📍 ${selectedLocation[1].toFixed(5)}, ${selectedLocation[0].toFixed(5)}`;
+      locationDisplay.classList.add('selected');
+    } else {
+      locationDisplay.textContent = 'No location selected yet';
       locationDisplay.classList.remove('selected');
     }
   });
@@ -834,6 +848,8 @@ function setupCreateMomentButton() {
     modal.classList.add('hidden');
     
     // Disable selection mode
+    isSelectingLocation = false;
+    map.getCanvas().style.cursor = '';
     document.getElementById('map').classList.remove('selection-mode');
     
     // Reset location
@@ -848,10 +864,34 @@ function setupCreateMomentButton() {
     momentPhotoPreview.classList.add('hidden');
     momentPhotoPrompt.style.display = 'flex';
     
+    // Reset temp form data
+    tempFormData = {};
+    
     if (selectionMarker) {
       selectionMarker.remove();
       selectionMarker = null;
     }
+  });
+
+  // Select Location button handler
+  document.getElementById('selectLocationBtn').addEventListener('click', () => {
+    // Save current form data
+    tempFormData = {
+      title: document.getElementById('momentTitle').value,
+      startsAt: document.getElementById('startsAt').value,
+      endsAt: document.getElementById('endsAt').value,
+      maxParticipants: document.getElementById('maxParticipants').value
+    };
+    
+    // Hide modal
+    modal.classList.add('hidden');
+    
+    // Enable location selection mode
+    isSelectingLocation = true;
+    map.getCanvas().style.cursor = 'crosshair';
+    document.getElementById('map').classList.add('selection-mode');
+    
+    showToast('Tap the map to select a location', 'info');
   });
 
   form.addEventListener('submit', async (e) => {
@@ -860,6 +900,16 @@ function setupCreateMomentButton() {
     if (!selectedLocation) {
       showToast('Please select a location on the map', 'error');
       return;
+    }
+
+    // Verify user is still authenticated
+    if (!currentUser) {
+      const user = await getCurrentUser();
+      if (!user) {
+        showToast('Please log in again to create a moment', 'error');
+        return;
+      }
+      currentUser = user;
     }
 
     const title = document.getElementById('momentTitle').value.trim();
@@ -872,6 +922,8 @@ function setupCreateMomentButton() {
     submitBtn.textContent = 'Creating moment...';
 
     try {
+      console.log('Creating moment with:', { title, startsAt, endsAt, maxParticipants, selectedLocation });
+      
       // Create moment first
       const { data, error } = await supabase.from('moments').insert({
         title,

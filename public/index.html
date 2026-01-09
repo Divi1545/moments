@@ -161,8 +161,10 @@
         <form id="createMomentForm">
           <input type="text" id="momentTitle" placeholder="What's happening? (max 40 chars)" maxlength="40" required>
           
-          <p class="help-text">📍 Tap anywhere on the map above to select location</p>
-          <div id="selectedLocation" class="location-display">👆 Tap the map above to select location</div>
+          <button type="button" id="selectLocationBtn" class="btn-secondary" style="width: 100%; margin: 10px 0;">
+            📍 Select Location on Map
+          </button>
+          <div id="selectedLocation" class="location-display">No location selected yet</div>
           
           <div class="moment-preview-section">
             <label>Preview Photo (Optional)</label>
