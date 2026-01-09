@@ -4,6 +4,19 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 
+// Android WebView compatibility headers
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'ALLOWALL');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // Inject environment variables into HTML
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') || req.path === '/') {

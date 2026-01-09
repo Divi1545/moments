@@ -1,0 +1,61 @@
+Perfect! I can see the error - Android phones are showing "Web page not available" with net::ERR_FILE_NOT_FOUND. This is a common Android WebView issue. Let me create a comprehensive prompt for Replit AI Agent:
+Problem
+Current Issue: Android devices show "Web page not available" error with net::ERR_FILE_NOT_FOUND when trying to load the Moments app. The app works fine on iOS and desktop browsers but completely fails on Android.
+Error Details:
+Error: net::ERR_FILE_NOT_FOUND
+Trying to load: file://data/user/0/com.islandloaf.app/app_settings/plugins/7242...
+Result: Blank white screen or error page
+Root Causes (Android-Specific)
+This is typically caused by:
+File path issues - Android WebView can't access local file:// paths
+CORS/Security policies - Android has stricter WebView security
+Missing meta tags - Android requires specific viewport/compatibility tags
+JavaScript errors - Android WebView might not support certain JS features
+CSS issues - Android renders some CSS differently
+Mixed content - HTTP/HTTPS mixed content blocked on Android
+Replit Agent Prompt
+**CRITICAL BUG: Moments App Not Displaying on Android Devices****Problem:**The Moments app displays completely blank or shows "Web page not available" error on Android phones/tablets. The app works perfectly on iOS and desktop browsers, but fails completely on Android devices within GoodBarber WebView.**Error Message on Android:**
+Web page not available
+net::ERR_FILE_NOT_FOUND
+**Symptoms:**- ✅ Works on iOS devices- ✅ Works on desktop browsers (Chrome, Firefox, Safari)- ❌ Blank screen on Android phones- ❌ Nothing loads, no map, no login screen- ❌ Shows file path error instead of content**Files to Check & Fix:**### 1. public/index.html - Add Android Compatibility Meta TagsCheck the `<head>` section and ensure these meta tags are present:<head>  <meta charset="UTF-8">  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">    <!-- CRITICAL for Android -->  <meta http-equiv="X-UA-Compatible" content="IE=edge">  <meta name="mobile-web-app-capable" content="yes">  <meta name="format-detection" content="telephone=no">    <!-- Android Chrome specific -->  <meta name="theme-color" content="#FF6B8A">  <meta name="mobile-web-app-capable" content="yes">    <!-- Security policy for Android WebView -->  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';">    <!-- Rest of head content --></head>
+2. Check All Script Loading - Fix Relative Paths
+Problem: Android WebView has issues with certain script loading methods.
+In public/index.html, ensure all scripts use absolute paths or proper module loading:
+<!-- Make sure these are at the end of body, not in head --><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script type="module" src="/js/config.js"></script><script type="module" src="/js/map.js"></script>
+NOT like this:
+<script type="module" src="js/config.js"></script> <!-- Missing leading slash -->
+3. server.js - Add Android-Specific Headers
+In server.js, add headers that Android WebView requires:
+app.use((req, res, next) => {  // Allow Android WebView to load content  res.setHeader('Access-Control-Allow-Origin', '*');  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');    // Critical for Android WebView  res.setHeader('X-Content-Type-Options', 'nosniff');  res.setHeader('X-Frame-Options', 'ALLOWALL');    // Allow mixed content (if needed)  res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;");    next();});
+4. public/js/config.js - Add Android Detection & Error Handling
+Add better error handling for Android:
+const isAndroid = /Android/i.test(navigator.userAgent);// Detect Androidif (isAndroid) {  console.log('Android device detected - applying compatibility fixes');}// Better error handling for Supabase initializationtry {  const { createClient } = supabase;  const supabaseUrl = import.meta.env.SUPABASE_URL || window.ENV?.SUPABASE_URL;  const supabaseAnonKey = import.meta.env.SUPABASE_ANON_KEY || window.ENV?.SUPABASE_ANON_KEY;    if (!supabaseUrl || !supabaseAnonKey) {    throw new Error('Supabase credentials missing');  }    window.supabase = createClient(supabaseUrl, supabaseAnonKey);    console.log('Supabase initialized successfully');} catch (error) {  console.error('Failed to initialize Supabase:', error);  alert('App initialization failed on Android. Error: ' + error.message);}
+5. Check Mapbox Loading on Android
+In public/js/map.js, add Android-specific Mapbox fixes:
+if (typeof mapboxgl === 'undefined') {// Before initializing Mapbox  console.error('Mapbox GL JS not loaded properly on Android');  alert('Map failed to load. Please check your connection and reload.');  return;}// Add better error handling for map initializationtry {  const map = new mapboxgl.Map({    container: 'map',    style: 'mapbox://styles/mapbox/streets-v11',    center: [0, 0],    zoom: 2,    // Android-specific options    preserveDrawingBuffer: true, // Helps with Android rendering    antialias: true  });    map.on('load', () => {    console.log('Map loaded successfully on Android');  });    map.on('error', (e) => {    console.error('Map error on Android:', e);  });  } catch (error) {  console.error('Map initialization failed on Android:', error);  document.getElementById('errorScreen').classList.remove('hidden');  document.getElementById('errorMessage').textContent = 'Map failed to load on your device. Error: ' + error.message;}
+6. public/styles.css - Fix Android WebView Rendering
+Add Android-specific CSS fixes:
+/* Android WebView fixes */* {  -webkit-tap-highlight-color: transparent;  -webkit-touch-callout: none;  -webkit-user-select: none;}body {  /* Fix Android viewport issues */  position: fixed;  width: 100%;  height: 100%;  overflow: hidden;  -webkit-overflow-scrolling: touch;}/* Fix Android input zoom issues */input, select, textarea {  font-size: 16px !important; /* Prevents zoom on focus in Android */}/* Fix Android button rendering */button {  -webkit-appearance: none;  appearance: none;}/* Fix Android WebView map display */#map {  position: absolute;  top: 0;  left: 0;  right: 0;  bottom: 0;  width: 100%;  height: 100%;}
+7. Add Console Logging for Debugging
+Add extensive logging to help debug Android issues:
+console.log('=== ANDROID DEBUG INFO ===');console.log('User Agent:', navigator.userAgent);console.log('Platform:', navigator.platform);// At the top of map.jsconsole.log('Screen:', window.screen.width + 'x' + window.screen.height);console.log('Window:', window.innerWidth + 'x' + window.innerHeight);console.log('Location protocol:', window.location.protocol);console.log('Location hostname:', window.location.hostname);console.log('=== END DEBUG INFO ===');
+8. Test Mixed Content Issues
+If using HTTPS for some resources and HTTP for others, Android will block mixed content. Ensure ALL resources use HTTPS:
+✅ https://cdn.jsdelivr.net/...
+✅ https://api.mapbox.com/...
+✅ https://yourproject.supabase.co/...
+❌ http://... (will be blocked on Android)
+Testing Checklist:
+After making changes:
+Test on Android Chrome browser first (not just WebView)
+Check browser console for errors (connect Android to computer, use Chrome DevTools)
+Test in GoodBarber WebView on Android
+Verify all resources load (check Network tab)
+Check if Supabase initializes properly
+Verify Mapbox loads and displays
+Quick Fix to Try First:
+If nothing else works, try this simple fix in index.html - change all module scripts to regular scripts:
+<!-- Instead of type="module" --><script type="module" src="/js/config.js"></script><!-- Try regular script with defer --><script defer src="/js/config.js"></script>
+Expected Result:
+After these fixes, the Moments app should load properly on Android devices, showing the map view and all functionality working identically to iOS.
+## SummaryThis comprehensive prompt covers all major Android WebView compatibility issues:- Meta tags for Android compatibility- Script loading fixes- Server headers for Android- Android-specific CSS fixes- Better error handling and logging- Mixed content security fixesThe Replit Agent should be able to systematically implement these fixes and resolve the Android display issue.
