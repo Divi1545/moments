@@ -181,7 +181,7 @@ function showAuthModal() {
       authPendingEmail = email;
       emailStep.classList.add('hidden');
       otpStep.classList.remove('hidden');
-      message.textContent = '✅ Check your email for your 6-digit code!';
+      message.textContent = '✅ Check your email for your 8-digit code!';
       message.style.color = 'var(--success)';
       otpInput.value = '';
       otpInput.focus();
@@ -203,8 +203,8 @@ function showAuthModal() {
     const otpCode = otpInput.value.trim();
     const btn = document.getElementById('verifyCodeBtn');
     
-    if (!otpCode || otpCode.length !== 6 || !/^\d{6}$/.test(otpCode)) {
-      message.textContent = 'Please enter a valid 6-digit code';
+    if (!otpCode || otpCode.length !== 8 || !/^\d{8}$/.test(otpCode)) {
+      message.textContent = 'Please enter a valid 8-digit code';
       message.style.color = 'var(--danger)';
       return;
     }
