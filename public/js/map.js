@@ -336,6 +336,7 @@ async function initApp() {
     await loadNearbyMoments();
     await loadSOSAlerts();
     subscribeToSOSAlerts();
+    setupMyMomentsButton();
   } catch (error) {
     console.error('App initialization error:', error);
     showErrorScreen('Failed to initialize app: ' + error.message);
@@ -480,27 +481,21 @@ async function loadNearbyMoments(searchQuery = null) {
   try {
     let moments, error;
 
-    // Use search if query provided, otherwise use nearby
+    // Query moments directly to get creator_id for highlighting
+    let query = supabase
+      .from('moments')
+      .select('id, title, lat, lng, starts_at, ends_at, max_participants, creator_id')
+      .eq('status', 'active')
+      .gt('ends_at', new Date().toISOString());
+
+    // Apply search filter
     if (searchQuery && searchQuery.trim()) {
-      const result = await supabase.rpc('search_moments', {
-        search_query: searchQuery.trim(),
-        user_lat: userLocation[1],
-        user_lng: userLocation[0],
-        radius_meters: 10000, // 10km for search
-        limit_count: 50,
-      });
-      moments = result.data;
-      error = result.error;
-    } else {
-      const result = await supabase.rpc('get_nearby_moments', {
-        user_lat: userLocation[1],
-        user_lng: userLocation[0],
-        radius_meters: 5000,
-        limit_count: 50,
-      });
-      moments = result.data;
-      error = result.error;
+      query = query.ilike('title', `%${searchQuery.trim()}%`);
     }
+
+    const result = await query.order('starts_at', { ascending: true }).limit(50);
+    moments = result.data;
+    error = result.error;
 
     if (error) {
       console.error('Error loading moments:', error);
@@ -516,14 +511,29 @@ async function loadNearbyMoments(searchQuery = null) {
       return;
     }
 
+    // Get participant counts for all moments
+    const momentIds = moments.map(m => m.id);
+    const { data: participantCounts } = await supabase
+      .from('moment_participants')
+      .select('moment_id')
+      .in('moment_id', momentIds);
+
+    const countMap = {};
+    participantCounts?.forEach(p => {
+      countMap[p.moment_id] = (countMap[p.moment_id] || 0) + 1;
+    });
+
     // Add markers for each moment
     moments.forEach(moment => {
+      const participantCount = countMap[moment.id] || 0;
+      const isUserMoment = moment.creator_id === currentUser?.id;
+
       const el = document.createElement('div');
       el.className = 'marker';
       el.style.cssText = `
         width: 32px;
         height: 32px;
-        background: #6366f1;
+        background: ${isUserMoment ? '#fbbf24' : '#6366f1'};
         border: 3px solid white;
         border-radius: 50%;
         cursor: pointer;
@@ -539,8 +549,9 @@ async function loadNearbyMoments(searchQuery = null) {
         .setHTML(`
           <div style="min-width: 200px;">
             <h3>${moment.title}</h3>
+            ${isUserMoment ? '<p style="color: #fbbf24; font-weight: bold;">⭐ Your Moment</p>' : ''}
             <p>${formatDateTime(moment.starts_at)}</p>
-            <p>👥 ${moment.participant_count}/${moment.max_participants}</p>
+            <p>👥 ${participantCount}/${moment.max_participants}</p>
             <button 
               class="btn-primary" 
               onclick="window.location.href='moment.html?id=${moment.id}'"
@@ -1006,5 +1017,123 @@ function setupCreateMomentButton() {
       submitBtn.textContent = 'Create Moment';
     }
   });
+}
+
+// ============================================================================
+// My Moments Feature
+// ============================================================================
+
+function setupMyMomentsButton() {
+  const myMomentsBtn = document.getElementById('myMomentsBtn');
+  const modal = document.getElementById('myMomentsModal');
+  const closeBtn = document.getElementById('closeMyMomentsModal');
+
+  if (!myMomentsBtn || !modal || !closeBtn) return;
+
+  myMomentsBtn.addEventListener('click', async () => {
+    await loadMyMoments();
+    modal.classList.remove('hidden');
+  });
+
+  closeBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+}
+
+async function loadMyMoments() {
+  if (!currentUser) return;
+
+  try {
+    // Load moments user is hosting (creator)
+    const { data: hosting, error: hostingError } = await supabase
+      .from('moments')
+      .select('id, title, starts_at, ends_at, status, lat, lng')
+      .eq('creator_id', currentUser.id)
+      .eq('status', 'active')
+      .order('starts_at', { ascending: true });
+
+    if (hostingError) throw hostingError;
+
+    // Load moments user has joined
+    const { data: joined, error: joinedError } = await supabase
+      .from('moment_participants')
+      .select(`
+        moment_id,
+        moments (
+          id,
+          title,
+          starts_at,
+          ends_at,
+          status,
+          creator_id,
+          lat,
+          lng
+        )
+      `)
+      .eq('user_id', currentUser.id);
+
+    if (joinedError) throw joinedError;
+
+    // Display hosting moments
+    const hostingContainer = document.getElementById('hostingMoments');
+    hostingContainer.innerHTML = '';
+
+    if (!hosting || hosting.length === 0) {
+      hostingContainer.innerHTML = '<p class="empty-state">You haven\'t created any moments yet</p>';
+    } else {
+      hosting.forEach(moment => {
+        const momentEl = createMomentListItem(moment);
+        hostingContainer.appendChild(momentEl);
+      });
+    }
+
+    // Display joined moments (excluding ones user created)
+    const joinedContainer = document.getElementById('joinedMoments');
+    joinedContainer.innerHTML = '';
+
+    const joinedMoments = joined
+      ?.map(j => j.moments)
+      .filter(m => m && m.status === 'active' && m.creator_id !== currentUser.id);
+
+    if (!joinedMoments || joinedMoments.length === 0) {
+      joinedContainer.innerHTML = '<p class="empty-state">You haven\'t joined any moments yet</p>';
+    } else {
+      joinedMoments.forEach(moment => {
+        const momentEl = createMomentListItem(moment);
+        joinedContainer.appendChild(momentEl);
+      });
+    }
+
+  } catch (error) {
+    console.error('Error loading my moments:', error);
+    showToast('Error loading your moments', 'error');
+  }
+}
+
+function createMomentListItem(moment) {
+  const div = document.createElement('div');
+  div.className = 'moment-list-item';
+  
+  const startsAt = new Date(moment.starts_at);
+  const endsAt = new Date(moment.ends_at);
+  const now = new Date();
+  
+  const isHappening = now >= startsAt && now <= endsAt;
+  const statusBadge = isHappening ? '<span class="status-badge live">🔴 Live</span>' : '<span class="status-badge upcoming">📅 Upcoming</span>';
+  
+  div.innerHTML = `
+    <div class="moment-list-item-content">
+      <h4>${moment.title}</h4>
+      <p class="moment-time">${formatDateTime(moment.starts_at)}</p>
+      ${statusBadge}
+    </div>
+    <button class="btn-primary btn-small">View</button>
+  `;
+  
+  div.querySelector('button').addEventListener('click', () => {
+    window.location.href = `moment.html?id=${moment.id}`;
+  });
+  
+  return div;
 }
 

@@ -41,6 +41,7 @@
         >
         <button id="clearSearch" class="clear-search-btn hidden">✕</button>
       </div>
+      <button id="myMomentsBtn" class="btn-icon">📋</button>
       <button id="createMomentBtn" class="btn-primary">+ Create</button>
     </header>
 
@@ -205,6 +206,28 @@
           
           <button type="submit" class="btn-primary">Create Moment</button>
         </form>
+      </div>
+    </div>
+
+    <!-- My Moments Modal -->
+    <div id="myMomentsModal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-btn" id="closeMyMomentsModal">&times;</button>
+        <h2>My Moments</h2>
+        
+        <div class="my-moments-section">
+          <h3>🎯 Hosting</h3>
+          <div id="hostingMoments" class="moments-list">
+            <p class="empty-state">You haven't created any moments yet</p>
+          </div>
+        </div>
+        
+        <div class="my-moments-section">
+          <h3>🤝 Joined</h3>
+          <div id="joinedMoments" class="moments-list">
+            <p class="empty-state">You haven't joined any moments yet</p>
+          </div>
+        </div>
       </div>
     </div>
 

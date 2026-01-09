@@ -61,6 +61,8 @@ node server.js
 - SOS alerts for emergencies
 - Content moderation and reporting
 - Multi-language support badges
+- **My Moments**: Track moments you've created (Hosting) and joined (Joined) from a quick-access button
+- **Visual highlighting**: Your created moments appear with gold markers on the map
 
 ## Supabase Edge Functions
 - **cleanup-ephemeral-images**: Removes expired images

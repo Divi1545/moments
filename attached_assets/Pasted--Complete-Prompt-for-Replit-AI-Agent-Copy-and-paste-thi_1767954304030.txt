@@ -1,0 +1,486 @@
+# 📝 Complete Prompt for Replit AI Agent
+
+Copy and paste this **entire prompt** to your Replit AI:
+
+---
+
+## **TASK: Fix Moment Navigation & Add "My Moments" Feature**
+
+### **Problem:**
+When users create a moment and navigate through the app (moment detail → chat → back to map), they lose track of their moment. There's no way to see or return to moments they've created or joined.
+
+### **Solution: Add "My Moments" Feature**
+
+---
+
+## **STEP 1: Modify `public/index.html`**
+
+**Add this button** in the header, right after the search container and BEFORE the Create button (around line 44):
+
+```html
+<button id="myMomentsBtn" class="btn-secondary">📋 My Moments</button>
+```
+
+**Add this modal** at the end of the file, just BEFORE the closing `</div>` for `#app` (around line 223):
+
+```html
+<!-- My Moments Modal -->
+<div id="myMomentsModal" class="modal hidden">
+  <div class="modal-content">
+    <button class="close-btn" id="closeMyMomentsModal">&times;</button>
+    <h2>My Moments</h2>
+    
+    <div class="my-moments-section">
+      <h3>🎯 Hosting</h3>
+      <div id="hostingMoments" class="moments-list">
+        <p class="empty-state">You haven't created any moments yet</p>
+      </div>
+    </div>
+    
+    <div class="my-moments-section">
+      <h3>🤝 Joined</h3>
+      <div id="joinedMoments" class="moments-list">
+        <p class="empty-state">You haven't joined any moments yet</p>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+## **STEP 2: Modify `public/js/map.js`**
+
+**Add this code** at the END of the `initApp()` function (around line 351, after `subscribeToSOSAlerts();`):
+
+```javascript
+setupMyMomentsButton();
+```
+
+**Add these NEW functions** at the END of the file (after line 982):
+
+```javascript
+// ============================================================================
+// My Moments Feature
+// ============================================================================
+
+function setupMyMomentsButton() {
+  const myMomentsBtn = document.getElementById('myMomentsBtn');
+  const modal = document.getElementById('myMomentsModal');
+  const closeBtn = document.getElementById('closeMyMomentsModal');
+
+  myMomentsBtn.addEventListener('click', async () => {
+    await loadMyMoments();
+    modal.classList.remove('hidden');
+  });
+
+  closeBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+}
+
+async function loadMyMoments() {
+  if (!currentUser) return;
+
+  try {
+    // Load moments user is hosting (creator)
+    const { data: hosting, error: hostingError } = await supabase
+      .from('moments')
+      .select('id, title, starts_at, ends_at, status, lat, lng')
+      .eq('creator_id', currentUser.id)
+      .eq('status', 'active')
+      .order('starts_at', { ascending: true });
+
+    if (hostingError) throw hostingError;
+
+    // Load moments user has joined
+    const { data: joined, error: joinedError } = await supabase
+      .from('moment_participants')
+      .select(`
+        moment_id,
+        moments (
+          id,
+          title,
+          starts_at,
+          ends_at,
+          status,
+          creator_id,
+          lat,
+          lng
+        )
+      `)
+      .eq('user_id', currentUser.id)
+      .neq('moments.creator_id', currentUser.id);
+
+    if (joinedError) throw joinedError;
+
+    // Display hosting moments
+    const hostingContainer = document.getElementById('hostingMoments');
+    hostingContainer.innerHTML = '';
+
+    if (!hosting || hosting.length === 0) {
+      hostingContainer.innerHTML = '<p class="empty-state">You haven\'t created any moments yet</p>';
+    } else {
+      hosting.forEach(moment => {
+        const momentEl = createMomentListItem(moment);
+        hostingContainer.appendChild(momentEl);
+      });
+    }
+
+    // Display joined moments
+    const joinedContainer = document.getElementById('joinedMoments');
+    joinedContainer.innerHTML = '';
+
+    const joinedMoments = joined
+      ?.map(j => j.moments)
+      .filter(m => m && m.status === 'active');
+
+    if (!joinedMoments || joinedMoments.length === 0) {
+      joinedContainer.innerHTML = '<p class="empty-state">You haven\'t joined any moments yet</p>';
+    } else {
+      joinedMoments.forEach(moment => {
+        const momentEl = createMomentListItem(moment);
+        joinedContainer.appendChild(momentEl);
+      });
+    }
+
+  } catch (error) {
+    console.error('Error loading my moments:', error);
+    showToast('Error loading your moments', 'error');
+  }
+}
+
+function createMomentListItem(moment) {
+  const div = document.createElement('div');
+  div.className = 'moment-list-item';
+  
+  const startsAt = new Date(moment.starts_at);
+  const endsAt = new Date(moment.ends_at);
+  const now = new Date();
+  
+  const isHappening = now >= startsAt && now <= endsAt;
+  const statusBadge = isHappening ? '<span class="status-badge live">🔴 Live</span>' : '<span class="status-badge upcoming">📅 Upcoming</span>';
+  
+  div.innerHTML = `
+    <div class="moment-list-item-content">
+      <h4>${moment.title}</h4>
+      <p class="moment-time">${formatDateTime(moment.starts_at)}</p>
+      ${statusBadge}
+    </div>
+    <button class="btn-primary btn-small">View</button>
+  `;
+  
+  div.querySelector('button').addEventListener('click', () => {
+    window.location.href = `moment.html?id=${moment.id}`;
+  });
+  
+  return div;
+}
+```
+
+**ALSO MODIFY** the `loadNearbyMoments()` function to highlight user's moments. Find the section where markers are created (around line 521-532) and **REPLACE** this:
+
+```javascript
+const el = document.createElement('div');
+el.className = 'marker';
+el.style.cssText = `
+  width: 32px;
+  height: 32px;
+  background: #6366f1;
+  border: 3px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+`;
+```
+
+**WITH THIS** (adds gold color for user's moments):
+
+```javascript
+const el = document.createElement('div');
+el.className = 'marker';
+
+// Check if this is user's moment
+const isUserMoment = moment.creator_id === currentUser?.id;
+
+el.style.cssText = `
+  width: 32px;
+  height: 32px;
+  background: ${isUserMoment ? '#fbbf24' : '#6366f1'};
+  border: 3px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+`;
+```
+
+**ALSO UPDATE** the `get_nearby_moments` and `search_moments` RPC calls to include `creator_id`. Find around line 496 and 502, and change the queries to:
+
+```javascript
+const result = await supabase.rpc('search_moments', {
+  search_query: searchQuery.trim(),
+  user_lat: userLocation[1],
+  user_lng: userLocation[0],
+  radius_meters: 10000,
+  limit_count: 50,
+});
+```
+
+Then **modify the SQL function** to return `creator_id`. But wait - check if `get_nearby_moments` and `search_moments` already return all moment columns. If they do, add `.select('*, creator_id')` after the RPC call.
+
+Actually, looking at the RPC functions, they return specific columns. We need to **ALSO SELECT from moments table** to get `creator_id`. Change the query to:
+
+```javascript
+// Use direct query instead of RPC to get creator_id
+const { data: moments, error } = await supabase
+  .from('moments')
+  .select('id, title, lat, lng, starts_at, ends_at, max_participants, creator_id')
+  .eq('status', 'active')
+  .gt('ends_at', new Date().toISOString())
+  .order('starts_at', { ascending: true })
+  .limit(50);
+```
+
+Wait, this removes the distance calculation. Let me think...
+
+Actually, **SIMPLIFY**: Just query the moments directly and calculate participant count separately. Replace the entire `loadNearbyMoments` function (starting around line 474) with this improved version:
+
+```javascript
+async function loadNearbyMoments(searchQuery = null) {
+  if (!userLocation) return;
+
+  // Clear existing markers
+  markers.forEach(marker => marker.remove());
+  markers = [];
+
+  try {
+    let moments, error;
+
+    // Query moments
+    let query = supabase
+      .from('moments')
+      .select('id, title, lat, lng, starts_at, ends_at, max_participants, creator_id')
+      .eq('status', 'active')
+      .gt('ends_at', new Date().toISOString());
+
+    // Apply search filter
+    if (searchQuery && searchQuery.trim()) {
+      query = query.ilike('title', `%${searchQuery.trim()}%`);
+    }
+
+    const result = await query.order('starts_at', { ascending: true }).limit(50);
+    moments = result.data;
+    error = result.error;
+
+    if (error) {
+      console.error('Error loading moments:', error);
+      showToast('Error loading moments', 'error');
+      return;
+    }
+
+    if (!moments || moments.length === 0) {
+      if (searchQuery && searchQuery.trim()) {
+        showToast(`No moments found for "${searchQuery}"`, 'info');
+      }
+      return;
+    }
+
+    // Get participant counts for all moments
+    const momentIds = moments.map(m => m.id);
+    const { data: participantCounts } = await supabase
+      .from('moment_participants')
+      .select('moment_id')
+      .in('moment_id', momentIds);
+
+    const countMap = {};
+    participantCounts?.forEach(p => {
+      countMap[p.moment_id] = (countMap[p.moment_id] || 0) + 1;
+    });
+
+    // Add markers for each moment
+    moments.forEach(moment => {
+      const participantCount = countMap[moment.id] || 0;
+      const isUserMoment = moment.creator_id === currentUser?.id;
+
+      const el = document.createElement('div');
+      el.className = 'marker';
+      el.style.cssText = `
+        width: 32px;
+        height: 32px;
+        background: ${isUserMoment ? '#fbbf24' : '#6366f1'};
+        border: 3px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      `;
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([moment.lng, moment.lat])
+        .addTo(map);
+
+      // Create popup
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`
+          <div style="min-width: 200px;">
+            <h3>${moment.title}</h3>
+            ${isUserMoment ? '<p style="color: #fbbf24; font-weight: bold;">⭐ Your Moment</p>' : ''}
+            <p>${formatDateTime(moment.starts_at)}</p>
+            <p>👥 ${participantCount}/${moment.max_participants}</p>
+            <button 
+              class="btn-primary" 
+              onclick="window.location.href='moment.html?id=${moment.id}'"
+              style="margin-top: 8px;"
+            >
+              View Details
+            </button>
+          </div>
+        `);
+
+      marker.setPopup(popup);
+      markers.push(marker);
+    });
+
+    if (searchQuery && searchQuery.trim()) {
+      showToast(`Found ${moments.length} moment${moments.length !== 1 ? 's' : ''}`, 'success');
+    }
+  } catch (error) {
+    console.error('Error in loadNearbyMoments:', error);
+    showToast('Error loading moments', 'error');
+  }
+
+  // Auto-refresh every 30 seconds (only if not searching)
+  if (!searchQuery) {
+    setTimeout(() => loadNearbyMoments(), 30000);
+  }
+}
+```
+
+---
+
+## **STEP 3: Add CSS to `public/styles.css`**
+
+**Add this at the END of the file:**
+
+```css
+/* My Moments Button */
+.btn-secondary {
+  background: var(--gray-200);
+  color: var(--gray-900);
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--gray-300);
+  transform: translateY(-1px);
+}
+
+/* My Moments Modal */
+.my-moments-section {
+  margin-bottom: 24px;
+}
+
+.my-moments-section h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--gray-700);
+}
+
+.moments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.moment-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
+}
+
+.moment-list-item:hover {
+  background: var(--gray-100);
+  border-color: var(--primary);
+}
+
+.moment-list-item-content {
+  flex: 1;
+}
+
+.moment-list-item h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: var(--gray-900);
+}
+
+.moment-time {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.live {
+  background: #fee;
+  color: #c00;
+}
+
+.status-badge.upcoming {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--gray-500);
+  padding: 20px;
+  font-style: italic;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+```
+
+---
+
+## **STEP 4: Test Everything**
+
+After making these changes:
+
+1. **Create a moment** - It should appear with a GOLD marker on the map
+2. **Click "My Moments"** - Should show your created moment under "Hosting"
+3. **Join another moment** - Should appear under "Joined" in My Moments
+4. **Navigate away and back** - Click "My Moments" to find your moments again
+
+---
+
+## **IMPORTANT NOTES:**
+
+- Do NOT modify any Supabase connection code
+- Do NOT change the database schema
+- Do NOT modify `server.js` or `config.js`
+- ONLY modify the 3 files mentioned: `index.html`, `map.js`, and `styles.css`
+- Test thoroughly before confirming
+
+---
+
+**Ready? Paste this entire prompt to Replit AI and let it work!** 🚀
