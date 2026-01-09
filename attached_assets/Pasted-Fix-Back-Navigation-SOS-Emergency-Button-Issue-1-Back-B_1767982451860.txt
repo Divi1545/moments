@@ -1,0 +1,189 @@
+Fix Back Navigation & SOS Emergency Button
+Issue 1: Back Button Navigation
+Current Problem: When clicking "← Back" from moment detail page (moment.html), it navigates to the home/welcome page instead of returning to the map view.Expected Behavior: Back button should return user to the map view (index.html with map displayed).Files to Check:
+
+public/moment.html - Back button element
+public/js/moment.js - Back button click handler
+Issue 2: SOS Emergency Button
+Current Problem: The red "SOS - Hold for Emergency" button doesn't work when clicked/held.Expected Behavior: Button should trigger emergency alert functionality when held down (long press).Files to Check:
+
+public/moment.html - SOS button element
+public/js/moment.js - SOS button event handlers
+Replit Agent Prompts
+Prompt 1: Fix Back Button Navigation
+**Bug Fix: Back Button Navigation in Moment Detail Page**
+
+**Problem:**
+When viewing a moment detail page (moment.html) and clicking the "← Back" button, the app navigates to the home/welcome page instead of returning to the map view.
+
+**Expected Behavior:**
+The back button should return the user to the map view (index.html with the map displayed, not the welcome screen).
+
+**Files to Fix:**
+
+1. **public/js/moment.js** - Find the back button click handler (likely around line with `getElementById('backBtn')`)
+2. **public/moment.html** - Verify back button ID matches
+
+**Required Changes:**
+
+In `public/js/moment.js`, find the back button handler:
+```javascript
+document.getElementById('backBtn').addEventListener('click', () => {
+  // Current code probably does: history.back() or window.location.href = '/'
+  // This is wrong - it goes to home page
+});
+Replace with:
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  // Go back to map view, not home page
+  window.location.href = '/index.html';
+  
+  // OR if user was already logged in, ensure map shows:
+  sessionStorage.setItem('skipWelcome', 'true');
+  window.location.href = '/';
+});
+Testing:
+
+Navigate to any moment detail page
+Click "← Back" button
+Should see map view, NOT welcome screen
+User should still be logged in
+Additional Fix:
+
+If the issue is in index.html/map.js showing welcome screen after navigation, update the welcome screen logic to check if user came from internal navigation and skip welcome screen.
+
+
+### Prompt 2: Implement SOS Emergency Button
+
+Feature Implementation: SOS Hold for Emergency ButtonProblem:
+
+The red "SOS - Hold for Emergency" button on the moment detail page doesn't do anything when clicked or held.Expected Behavior:
+
+When user holds down the SOS button for 3 seconds, it should trigger an emergency alert that:
+
+Shows a confirmation dialog
+Sends emergency notification to all moment participants
+Optionally shares user's live location
+Shows visual feedback while holding (progress indicator)
+Files to Update:
+
+public/js/moment.js - Add SOS button functionality
+public/moment.html - Verify SOS button ID
+public/styles.css - Add visual feedback styles (optional)
+Implementation:In public/js/moment.js, add this SOS button handler:
+
+// SOS Emergency Button - Hold for 3 seconds to trigger
+const sosBtn = document.getElementById('sosBtn'); // Or whatever the ID is
+let sosHoldTimer = null;
+let sosProgress = 0;
+
+sosBtn.addEventListener('mousedown', startSosHold);
+sosBtn.addEventListener('touchstart', startSosHold);
+sosBtn.addEventListener('mouseup', cancelSosHold);
+sosBtn.addEventListener('touchend', cancelSosHold);
+sosBtn.addEventListener('mouseleave', cancelSosHold);
+
+function startSosHold(e) {
+  e.preventDefault();
+  sosProgress = 0;
+  
+  // Visual feedback - make button pulsate or show progress
+  sosBtn.style.opacity = '0.7';
+  sosBtn.textContent = 'Hold for Emergency (0%)';
+  
+  sosHoldTimer = setInterval(() => {
+    sosProgress += 100 / 30; // 3 seconds = 30 intervals of 100ms
+    
+    if (sosProgress >= 100) {
+      clearInterval(sosHoldTimer);
+      triggerSosEmergency();
+    } else {
+      sosBtn.textContent = `Hold for Emergency (${Math.floor(sosProgress)}%)`;
+    }
+  }, 100);
+}
+
+function cancelSosHold() {
+  if (sosHoldTimer) {
+    clearInterval(sosHoldTimer);
+    sosHoldTimer = null;
+    sosProgress = 0;
+    sosBtn.style.opacity = '1';
+    sosBtn.innerHTML = '<span>SOS</span> Hold for Emergency';
+  }
+}
+
+async function triggerSosEmergency() {
+  sosBtn.style.opacity = '1';
+  sosBtn.textContent = '🚨 Emergency Alert Sent!';
+  
+  // Get current location
+  let location = null;
+  if (navigator.geolocation) {
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+      location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+    } catch (error) {
+      console.error('Could not get location for SOS:', error);
+    }
+  }
+  
+  // Send emergency message to moment chat
+  const momentId = new URLSearchParams(window.location.search).get('id');
+  
+  try {
+    const { data: user } = await supabase.auth.getUser();
+    
+    await supabase.from('moment_messages').insert({
+      moment_id: momentId,
+      user_id: user.user.id,
+      content: `🚨 EMERGENCY ALERT 🚨 - ${location ? `Location: ${location.lat}, ${location.lng}` : 'Location unavailable'}`,
+      is_system: true
+    });
+    
+    alert('Emergency alert sent to all participants!');
+  } catch (error) {
+    console.error('Failed to send SOS:', error);
+    alert('Failed to send emergency alert. Please try again.');
+  }
+  
+  // Reset button after 3 seconds
+  setTimeout(() => {
+    sosBtn.innerHTML = '<span>SOS</span> Hold for Emergency';
+  }, 3000);
+}
+Find the SOS Button:
+
+Search for the button with text "Hold for Emergency" in moment.html and get its ID. If it doesn't have an ID, add one:
+
+<button id="sosBtn" class="btn-emergency">SOS Hold for Emergency</button>
+Testing:
+
+Go to any moment detail page
+Press and hold the SOS button for 3 seconds
+Should see progress percentage increase
+After 3 seconds, emergency message should post to chat
+All participants should see the emergency alert
+If you release before 3 seconds, it should cancel
+Optional Enhancement:
+
+Add vibration feedback on mobile:
+
+if (navigator.vibrate) {
+  navigator.vibrate(200); // Vibrate when emergency triggered
+}
+
+## Summary
+
+Both prompts are ready to copy/paste into Replit AI Agent. They include:
+- Clear problem descriptions
+- Expected behavior
+- Specific file paths
+- Complete code implementations
+- Testing instructions
+
