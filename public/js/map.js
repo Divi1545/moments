@@ -811,25 +811,9 @@ function setupCreateMomentButton() {
     }
   });
 
-  createBtn.addEventListener('click', async () => {
+  createBtn.addEventListener('click', () => {
     if (!map) {
       showToast('Map is not ready. Please wait a moment.', 'error');
-      return;
-    }
-    
-    // Check if user already has an active hosted moment
-    const { data: checkResult, error } = await supabase.rpc('check_user_active_hosted_moment', {
-      user_uuid: currentUser.id
-    });
-    
-    if (error) {
-      console.error('Error checking active moment:', error);
-      showToast('Error checking your moments', 'error');
-      return;
-    }
-    
-    if (checkResult && checkResult.length > 0 && checkResult[0].has_active_moment) {
-      showToast(`You already have an active moment: "${checkResult[0].moment_title}". End it first!`, 'error');
       return;
     }
     
