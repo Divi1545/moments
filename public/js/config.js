@@ -18,19 +18,10 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Configuration error: Missing Supabase credentials');
 }
 
-// Initialize Supabase client with proper settings
+// Initialize Supabase client - simple, no extra options
 const { createClient } = window.supabase;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-    flowType: 'implicit',
-    storage: window.localStorage,
-    storageKey: 'moments-auth',
-  },
-});
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 console.log('Supabase client initialized successfully');
 

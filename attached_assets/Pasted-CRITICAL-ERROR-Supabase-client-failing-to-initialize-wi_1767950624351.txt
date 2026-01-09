@@ -1,0 +1,65 @@
+CRITICAL ERROR: Supabase client failing to initialize with "signal is aborted without reason"
+
+Console shows:
+- Supabase URL set: ✓
+- Supabase Key set: ✓  
+- Client initialized: ✓
+- Then: Auth error: AbortError: signal is aborted without reason
+
+FIX THIS NOW:
+
+1. Check public/js/config.js - The Supabase client initialization:
+   
+   WRONG (if you're doing this):
+   const supabase = createClient(url, key, { 
+     auth: { persistSession: true, autoRefreshToken: false }
+   })
+   
+   CORRECT (use this):
+   const supabase = createClient(
+     window.ENV?.SUPABASE_URL,
+     window.ENV?.SUPABASE_ANON_KEY
+   )
+   
+   NO extra options! Just URL and key!
+
+2. Check public/js/map.js - Remove any auth.setSession() calls that might be aborting
+   - Look for: supabase.auth.setSession()
+   - Look for: Setting session from magic link tokens
+   - REMOVE these! Let Supabase handle auth automatically
+
+3. Check server.js or index.js - Environment variable injection:
+   
+   Make sure you're injecting variables like this:
+   
+   app.use((req, res, next) => {
+     if (req.path.endsWith('.html') || req.path === '/') {
+       const html = fs.readFileSync('./public/index.html', 'utf-8');
+       const injected = html.replace('</head>', `
+         <script>
+           window.ENV = {
+             SUPABASE_URL: '${process.env.SUPABASE_URL}',
+             SUPABASE_ANON_KEY: '${process.env.SUPABASE_ANON_KEY}',
+             MAPBOX_TOKEN: '${process.env.MAPBOX_TOKEN}'
+           };
+         </script>
+       </head>`);
+       return res.send(injected);
+     }
+     next();
+   });
+
+4. Make sure Supabase CDN script is loaded in index.html:
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+5. Simplify the auth check - don't try to handle magic link tokens manually
+
+The error happens because something is calling abort() on a request signal. 
+Find where you're trying to manually handle auth and REMOVE it.
+Let the Supabase client handle everything automatically.
+
+DO NOT use any custom auth options in createClient().
+DO NOT try to manually parse URL tokens.
+DO NOT call setSession() unless absolutely necessary.
+
+Fix these issues and restart the server.

@@ -49,98 +49,7 @@ async function initAuth() {
 async function checkAuthStatus() {
   const loader = document.getElementById('loader');
   
-  // Extract tokens from URL hash BEFORE any Supabase calls
-  let accessToken = null;
-  let refreshToken = null;
-  
-  if (window.location.hash && window.location.hash.includes('access_token')) {
-    console.log('Found auth tokens in URL hash');
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    accessToken = hashParams.get('access_token');
-    refreshToken = hashParams.get('refresh_token');
-    
-    // IMMEDIATELY clear the hash to prevent Supabase from trying to process it
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
-  }
-  
-  try {
-    // If we have tokens from the URL, set the session manually
-    if (accessToken && refreshToken) {
-      console.log('Setting session from magic link tokens...');
-      
-      const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      
-      if (error) {
-        console.error('Session set error:', error);
-        // Don't throw - try getSession as fallback
-      } else if (data.session) {
-        currentUser = data.session.user;
-        console.log('User logged in via magic link:', currentUser.id);
-        
-        const hasProfile = await checkProfileExists(currentUser.id);
-        if (!hasProfile) {
-          showProfileModal();
-          loader.classList.add('hidden');
-        } else {
-          await initApp();
-          loader.classList.add('hidden');
-        }
-        return;
-      }
-    }
-    
-    // Normal session check (no magic link callback or token set failed)
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error('Auth error:', error);
-      // If it's the abort error, we can ignore and show auth modal
-      if (error.message && error.message.includes('abort')) {
-        console.log('Ignoring abort error, showing auth modal');
-        showAuthModal();
-        loader.classList.add('hidden');
-        return;
-      }
-      throw new Error('Authentication error: ' + error.message);
-    }
-    
-    if (session) {
-      currentUser = session.user;
-      console.log('User logged in:', currentUser.id);
-      
-      try {
-        const hasProfile = await Promise.race([
-          checkProfileExists(currentUser.id),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Profile check timeout')), 10000))
-        ]);
-        
-        if (!hasProfile) {
-          showProfileModal();
-          loader.classList.add('hidden');
-        } else {
-          await initApp();
-          loader.classList.add('hidden');
-        }
-      } catch (profileError) {
-        console.error('Profile check error:', profileError);
-        // If profile check fails, assume no profile and show profile modal
-        showProfileModal();
-        loader.classList.add('hidden');
-      }
-    } else {
-      showAuthModal();
-      loader.classList.add('hidden');
-    }
-  } catch (error) {
-    console.error('Auth error:', error);
-    loader.classList.add('hidden');
-    showErrorScreen('Failed to initialize: ' + error.message);
-  }
-
-  // Listen for auth changes
+  // Listen for auth changes first
   supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('Auth state changed:', event);
     
@@ -152,13 +61,49 @@ async function checkAuthStatus() {
         showProfileModal();
       } else {
         showToast('Welcome back!', 'success');
-        window.location.reload();
+        await initApp();
+        loader.classList.add('hidden');
       }
     } else if (event === 'SIGNED_OUT') {
       showToast('Signed out', 'info');
       window.location.reload();
     }
   });
+  
+  try {
+    // Let Supabase handle auth automatically - just check current session
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Auth error:', error);
+      // Show auth modal on any error
+      showAuthModal();
+      loader.classList.add('hidden');
+      return;
+    }
+    
+    if (session) {
+      currentUser = session.user;
+      console.log('User logged in:', currentUser.id);
+      
+      const hasProfile = await checkProfileExists(currentUser.id);
+      
+      if (!hasProfile) {
+        showProfileModal();
+        loader.classList.add('hidden');
+      } else {
+        await initApp();
+        loader.classList.add('hidden');
+      }
+    } else {
+      showAuthModal();
+      loader.classList.add('hidden');
+    }
+  } catch (error) {
+    console.error('Auth error:', error);
+    loader.classList.add('hidden');
+    showAuthModal();
+  }
 }
 
 // Show auth modal
