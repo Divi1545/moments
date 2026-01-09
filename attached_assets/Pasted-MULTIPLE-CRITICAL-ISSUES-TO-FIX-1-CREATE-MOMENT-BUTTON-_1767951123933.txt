@@ -1,0 +1,65 @@
+MULTIPLE CRITICAL ISSUES TO FIX:
+
+1. CREATE MOMENT BUTTON NOT WORKING
+   - The "+ Create" button in header doesn't open the modal
+   - OR the modal opens but "Create Moment" button inside doesn't work
+   - Check public/js/map.js - setupCreateMomentButton() function
+   - Make sure form submission uses: await supabase.from('moments').insert({...})
+   - Must include ALL required fields: title, creator_id, location, lat, lng, starts_at, ends_at, max_participants
+   - Check console for errors when clicking create
+
+2. CREATED MOMENTS DON'T SHOW ON MAP
+   - After creating a moment, it doesn't appear as a marker
+   - Fix: Call loadNearbyMoments() after successful creation
+   - In map.js, after moment creation success:
+     showToast('Moment created!', 'success');
+     modal.classList.add('hidden');
+     await loadNearbyMoments(); // ADD THIS LINE
+
+3. NO BACK BUTTON ON CHAT PAGE
+   - Chat page needs a back button to return to moment detail
+   - In public/chat.html, add to header:
+     <button id="backBtn" class="btn-back">← Back</button>
+   - In public/js/chat.js, add click handler:
+     document.getElementById('backBtn').addEventListener('click', () => {
+       window.location.href = `moment.html?id=${momentId}`;
+     });
+
+4. NO WAY TO VIEW YOUR OWN MOMENTS
+   - Need a "My Moments" button or list
+   - Add to header in index.html:
+     <button id="myMomentsBtn" class="btn-secondary">My Moments</button>
+   - Show list of moments user created or joined
+   - Each moment should be clickable to go to moment.html?id=MOMENT_ID
+
+5. BACK BUTTON ON MOMENT DETAIL DOESN'T WORK
+   - In public/moment.html, check if back button exists
+   - In public/js/moment.js, add:
+     document.getElementById('backBtn')?.addEventListener('click', () => {
+       window.location.href = 'index.html';
+     });
+
+6. FIX AUTH ABORT ERROR
+   - Still getting "signal is aborted without reason"
+   - In public/js/map.js, find and REMOVE any code that does:
+     - supabase.auth.setSession()
+     - Parsing URL hash for tokens manually
+     - Any AbortController usage
+   - Let Supabase handle auth automatically
+
+PRIORITY ORDER:
+1. Fix create moment button (most critical)
+2. Fix moments displaying on map after creation
+3. Add/fix navigation buttons (back buttons)
+4. Add "My Moments" feature
+5. Fix auth error
+
+Test each fix:
+- Can you create a moment? ✓
+- Does it show on map? ✓
+- Can you click it and view details? ✓
+- Can you go back to map? ✓
+- Can you open chat? ✓
+- Can you go back from chat? ✓
+
+Fix all of these issues and report back when done.

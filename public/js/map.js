@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { supabase, mapboxToken, getCurrentUser, checkProfileExists, formatDateTime, showToast } from './config.js';
-import { validateImage, createSquareThumbnail, getPreviewUrl } from './imageUtils.js';
+import { validateImage, compressImage, createSquareThumbnail, getPreviewUrl } from './imageUtils.js';
 
 let map = null;
 let markers = [];
