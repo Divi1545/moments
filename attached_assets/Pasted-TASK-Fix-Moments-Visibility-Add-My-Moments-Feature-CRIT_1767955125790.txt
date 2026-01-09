@@ -1,0 +1,420 @@
+TASK: Fix Moments Visibility + Add "My Moments" Feature
+
+CRITICAL BUGS TO FIX:
+1. Created moments are not visible to other users (missing creator_id)
+2. Users can't find their moments after navigating away (no "My Moments" button)
+3. User's own moments not visually distinguished on map
+
+============================================================================
+FIX 1: ADD CREATOR_ID TO MOMENT CREATION
+============================================================================
+
+FILE: public/js/map.js
+
+FIND this code (around line 907-915):
+const { data, error } = await supabase.from('moments').insert({
+  title,
+  location: `POINT(${selectedLocation[0]} ${selectedLocation[1]})`,
+  lat: selectedLocation[1],
+  lng: selectedLocation[0],
+  starts_at: startsAt,
+  ends_at: endsAt,
+  max_participants: maxParticipants,
+}).select().single();REPLACE WITH:
+const { data, error } = await supabase.from('moments').insert({
+  title,
+  creator_id: currentUser.id,  // ✅ CRITICAL FIX
+  location: `POINT(${selectedLocation[0]} ${selectedLocation[1]})`,
+  lat: selectedLocation[1],
+  lng: selectedLocation[0],
+  starts_at: startsAt,
+  ends_at: endsAt,
+  max_participants: maxParticipants,
+}).select().single();============================================================================
+FIX 2: ADD "MY MOMENTS" BUTTON TO HEADER
+============================================================================
+
+FILE: public/index.html
+
+FIND the header section (around line 32-45):
+<header class="header hidden" id="mainHeader">
+  <h1 class="logo">Moments</h1>
+  <div class="search-container">
+    <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="🔍 Search moments..."
+      class="search-input"
+      autocomplete="off"
+    >
+    <button id="clearSearch" class="clear-search-btn hidden">✕</button>
+  </div>
+  <button id="createMomentBtn" class="btn-primary">+ Create</button>
+</header>REPLACE WITH (add My Moments button):
+<header class="header hidden" id="mainHeader">
+  <h1 class="logo">Moments</h1>
+  <div class="search-container">
+    <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="🔍 Search moments..."
+      class="search-input"
+      autocomplete="off"
+    >
+    <button id="clearSearch" class="clear-search-btn hidden">✕</button>
+  </div>
+  <button id="myMomentsBtn" class="btn-secondary">📋 My Moments</button>
+  <button id="createMomentBtn" class="btn-primary">+ Create</button>
+</header>============================================================================
+FIX 3: ADD "MY MOMENTS" MODAL TO HTML
+============================================================================
+
+FILE: public/index.html
+
+ADD this modal BEFORE the closing </div> of #app (around line 223, before </div>):
+
+<!-- My Moments Modal -->
+<div id="myMomentsModal" class="modal hidden">
+  <div class="modal-content">
+    <button class="close-btn" id="closeMyMomentsModal">&times;</button>
+    <h2>My Moments</h2>
+    
+    <div class="my-moments-section">
+      <h3>🎯 Hosting</h3>
+      <div id="hostingMoments" class="moments-list">
+        <p class="empty-state">You haven't created any moments yet</p>
+      </div>
+    </div>
+    
+    <div class="my-moments-section">
+      <h3>🤝 Joined</h3>
+      <div id="joinedMoments" class="moments-list">
+        <p class="empty-state">You haven't joined any moments yet</p>
+      </div>
+    </div>
+  </div>
+</div>============================================================================
+FIX 4: ADD MY MOMENTS LOGIC TO map.js
+============================================================================
+
+FILE: public/js/map.js
+
+STEP A: In the initApp() function (around line 340-355), ADD this line at the end:
+
+async function initApp() {
+  try {
+    document.getElementById('mainHeader').classList.remove('hidden');
+    document.getElementById('map').classList.remove('hidden');
+    
+    await initMap();
+    setupCreateMomentButton();
+    setupSearch();
+    setupMyMomentsButton();  // ✅ ADD THIS LINE
+    await loadNearbyMoments();
+    await loadSOSAlerts();
+    subscribeToSOSAlerts();
+  } catch (error) {
+    console.error('App initialization error:', error);
+    showErrorScreen('Failed to initialize app: ' + error.message);
+  }
+}STEP B: ADD these complete functions at the END of map.js (after line 982):
+
+// ============================================================================
+// My Moments Feature
+// ============================================================================
+
+function setupMyMomentsButton() {
+  const myMomentsBtn = document.getElementById('myMomentsBtn');
+  const modal = document.getElementById('myMomentsModal');
+  const closeBtn = document.getElementById('closeMyMomentsModal');
+
+  myMomentsBtn.addEventListener('click', async () => {
+    await loadMyMoments();
+    modal.classList.remove('hidden');
+  });
+
+  closeBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+}
+
+async function loadMyMoments() {
+  if (!currentUser) return;
+
+  try {
+    // Load moments user is hosting
+    const { data: hosting, error: hostingError } = await supabase
+      .from('moments')
+      .select('id, title, starts_at, ends_at, status, lat, lng')
+      .eq('creator_id', currentUser.id)
+      .eq('status', 'active')
+      .order('starts_at', { ascending: true });
+
+    if (hostingError) throw hostingError;
+
+    // Load moments user has joined
+    const { data: joined, error: joinedError } = await supabase
+      .from('moment_participants')
+      .select(`
+        moment_id,
+        moments (
+          id,
+          title,
+          starts_at,
+          ends_at,
+          status,
+          creator_id,
+          lat,
+          lng
+        )
+      `)
+      .eq('user_id', currentUser.id)
+      .neq('moments.creator_id', currentUser.id);
+
+    if (joinedError) throw joinedError;
+
+    // Display hosting moments
+    const hostingContainer = document.getElementById('hostingMoments');
+    hostingContainer.innerHTML = '';
+
+    if (!hosting || hosting.length === 0) {
+      hostingContainer.innerHTML = '<p class="empty-state">You haven\'t created any moments yet</p>';
+    } else {
+      hosting.forEach(moment => {
+        const momentEl = createMomentListItem(moment);
+        hostingContainer.appendChild(momentEl);
+      });
+    }
+
+    // Display joined moments
+    const joinedContainer = document.getElementById('joinedMoments');
+    joinedContainer.innerHTML = '';
+
+    const joinedMoments = joined
+      ?.map(j => j.moments)
+      .filter(m => m && m.status === 'active');
+
+    if (!joinedMoments || joinedMoments.length === 0) {
+      joinedContainer.innerHTML = '<p class="empty-state">You haven\'t joined any moments yet</p>';
+    } else {
+      joinedMoments.forEach(moment => {
+        const momentEl = createMomentListItem(moment);
+        joinedContainer.appendChild(momentEl);
+      });
+    }
+
+  } catch (error) {
+    console.error('Error loading my moments:', error);
+    showToast('Error loading your moments', 'error');
+  }
+}
+
+function createMomentListItem(moment) {
+  const div = document.createElement('div');
+  div.className = 'moment-list-item';
+  
+  const startsAt = new Date(moment.starts_at);
+  const endsAt = new Date(moment.ends_at);
+  const now = new Date();
+  
+  const isHappening = now >= startsAt && now <= endsAt;
+  const statusBadge = isHappening 
+    ? '<span class="status-badge live">🔴 Live</span>' 
+    : '<span class="status-badge upcoming">📅 Upcoming</span>';
+  
+  div.innerHTML = `
+    <div class="moment-list-item-content">
+      <h4>${moment.title}</h4>
+      <p class="moment-time">${formatDateTime(moment.starts_at)}</p>
+      ${statusBadge}
+    </div>
+    <button class="btn-primary btn-small">View</button>
+  `;
+  
+  div.querySelector('button').addEventListener('click', () => {
+    window.location.href = `moment.html?id=${moment.id}`;
+  });
+  
+  return div;
+}STEP C: UPDATE loadNearbyMoments to highlight user's moments with GOLD markers.
+
+FIND the loadNearbyMoments function (around line 474-572) and look for where markers are created (around line 522-532).
+
+FIND this code:
+const el = document.createElement('div');
+el.className = 'marker';
+el.style.cssText = `
+  width: 32px;
+  height: 32px;
+  background: #6366f1;
+  border: 3px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+`;REPLACE WITH:
+const el = document.createElement('div');
+el.className = 'marker';
+
+// Check if this is user's moment
+const isUserMoment = moment.creator_id === currentUser?.id;
+
+el.style.cssText = `
+  width: 32px;
+  height: 32px;
+  background: ${isUserMoment ? '#fbbf24' : '#6366f1'};
+  border: 3px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+`;ALSO UPDATE the popup HTML (around line 540-552) to show "Your Moment" badge:
+
+FIND:
+const popup = new mapboxgl.Popup({ offset: 25 })
+  .setHTML(`
+    <div style="min-width: 200px;">
+      <h3>${moment.title}</h3>
+      <p>${formatDateTime(moment.starts_at)}</p>
+      <p>👥 ${moment.participant_count}/${moment.max_participants}</p>
+      <button 
+        class="btn-primary" 
+        onclick="window.location.href='moment.html?id=${moment.id}'"
+        style="margin-top: 8px;"
+      >
+        View Details
+      </button>
+    </div>
+  `);REPLACE WITH:
+const isUserMoment = moment.creator_id === currentUser?.id;
+
+const popup = new mapboxgl.Popup({ offset: 25 })
+  .setHTML(`
+    <div style="min-width: 200px;">
+      <h3>${moment.title}</h3>
+      ${isUserMoment ? '<p style="color: #fbbf24; font-weight: bold;">⭐ Your Moment</p>' : ''}
+      <p>${formatDateTime(moment.starts_at)}</p>
+      <p>👥 ${moment.participant_count}/${moment.max_participants}</p>
+      <button 
+        class="btn-primary" 
+        onclick="window.location.href='moment.html?id=${moment.id}'"
+        style="margin-top: 8px;"
+      >
+        View Details
+      </button>
+    </div>
+  `);============================================================================
+FIX 5: ADD CSS STYLES
+============================================================================
+
+FILE: public/styles.css
+
+ADD this at the END of the file:
+
+/* My Moments Button */
+.btn-secondary {
+  background: var(--gray-200);
+  color: var(--gray-900);
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-right: 8px;
+}
+
+.btn-secondary:hover {
+  background: var(--gray-300);
+  transform: translateY(-1px);
+}
+
+/* My Moments Modal */
+.my-moments-section {
+  margin-bottom: 24px;
+}
+
+.my-moments-section h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--gray-700);
+}
+
+.moments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.moment-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
+}
+
+.moment-list-item:hover {
+  background: var(--gray-100);
+  border-color: var(--primary);
+}
+
+.moment-list-item-content {
+  flex: 1;
+}
+
+.moment-list-item h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: var(--gray-900);
+}
+
+.moment-time {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.live {
+  background: #fee;
+  color: #c00;
+}
+
+.status-badge.upcoming {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--gray-500);
+  padding: 20px;
+  font-style: italic;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+}============================================================================
+TESTING CHECKLIST
+============================================================================
+
+After implementing:
+1. ✅ Create a moment - should have GOLD marker on map
+2. ✅ Check if other users can see it (open in incognito/another account)
+3. ✅ Click "My Moments" - should show your created moment under "Hosting"
+4. ✅ Join another user's moment - should appear under "Joined"
+5. ✅ Navigate to moment detail → chat → back to map → "My Moments" still works
+
+DO NOT modify: server.js, config.js, or any Supabase connection code.
+ONLY modify: index.html, map.js, and styles.css as specified above.
