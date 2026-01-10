@@ -106,8 +106,22 @@ async function loadMoment() {
     }
   }
 
-  // Check if user can delete (creator only)
-  if (moment.creator_id === currentUser.id) {
+  // Check if user can delete (creator or admin)
+  const isCreator = moment.creator_id === currentUser.id;
+  let isAdmin = false;
+  
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_type')
+    .eq('id', currentUser.id)
+    .single();
+  
+  if (profile && profile.user_type === 'admin') {
+    isAdmin = true;
+  }
+  
+  if (isCreator || isAdmin) {
     document.getElementById('deleteBtn').classList.remove('hidden');
   }
 
