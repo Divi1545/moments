@@ -478,9 +478,10 @@ async function initApp() {
     await initMap();
     setupCreateMomentButton();
     setupSearch();
-    await loadNearbyMoments();
+    // loadNearbyMoments will be called after map loads with user location
     await loadSOSAlerts();
     subscribeToSOSAlerts();
+    subscribeToNewMoments();
     setupMyMomentsButton();
   } catch (error) {
     console.error('App initialization error:', error);
@@ -546,8 +547,10 @@ function createMap(center) {
       zoom: 13,
     });
 
-    map.on('load', () => {
+    map.on('load', async () => {
       console.log('✅ Map loaded successfully');
+      // Load nearby moments after map is ready
+      await loadNearbyMoments();
     });
 
     map.on('error', (e) => {
@@ -616,8 +619,11 @@ function createMap(center) {
 // Load and Display Moments
 // ============================================================================
 
-async function loadNearbyMoments(searchQuery = null) {
-  if (!userLocation) return;
+async function loadNearbyMoments(searchQuery = null, radiusKm = 50) {
+  if (!userLocation) {
+    console.log('No user location yet, waiting...');
+    return;
+  }
 
   // Clear existing markers
   markers.forEach(marker => marker.remove());
@@ -626,12 +632,27 @@ async function loadNearbyMoments(searchQuery = null) {
   try {
     let moments, error;
 
-    // Query moments directly to get creator_id for highlighting
+    // Calculate bounding box for radius (1 degree latitude ≈ 111km)
+    const userLat = userLocation[1];
+    const userLng = userLocation[0];
+    const latDelta = radiusKm / 111;
+    const lngDelta = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
+    
+    const minLat = userLat - latDelta;
+    const maxLat = userLat + latDelta;
+    const minLng = userLng - lngDelta;
+    const maxLng = userLng + lngDelta;
+
+    // Query moments within bounding box
     let query = supabase
       .from('moments')
       .select('id, title, lat, lng, starts_at, ends_at, max_participants, creator_id')
       .eq('status', 'active')
-      .gt('ends_at', new Date().toISOString());
+      .gt('ends_at', new Date().toISOString())
+      .gte('lat', minLat)
+      .lte('lat', maxLat)
+      .gte('lng', minLng)
+      .lte('lng', maxLng);
 
     // Apply search filter
     if (searchQuery && searchQuery.trim()) {
@@ -1280,5 +1301,42 @@ function createMomentListItem(moment) {
   });
   
   return div;
+}
+
+// ============================================================================
+// Real-time Subscriptions for New Moments
+// ============================================================================
+
+function subscribeToNewMoments() {
+  supabase
+    .channel('moments-changes')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'moments'
+    }, async (payload) => {
+      console.log('New moment created:', payload.new);
+      // Reload moments to include the new one
+      await loadNearbyMoments();
+    })
+    .on('postgres_changes', {
+      event: 'DELETE',
+      schema: 'public',
+      table: 'moments'
+    }, async (payload) => {
+      console.log('Moment deleted:', payload.old);
+      // Reload moments to remove deleted one
+      await loadNearbyMoments();
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'moments'
+    }, async (payload) => {
+      console.log('Moment updated:', payload.new);
+      // Reload moments to update status
+      await loadNearbyMoments();
+    })
+    .subscribe();
 }
 

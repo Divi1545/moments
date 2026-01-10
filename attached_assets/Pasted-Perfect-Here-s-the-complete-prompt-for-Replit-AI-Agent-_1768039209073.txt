@@ -1,0 +1,272 @@
+Perfect! Here's the complete prompt for Replit AI Agent:
+
+---
+
+## **Prompt for Replit AI Agent: Fix Moments Display & Add Delete Feature**
+
+```
+**Two Critical Features Needed for Moments App**
+
+### Issue 1: Moments Not Showing on Map
+
+**Current Problem:**
+When users open the map, they see a blank map with no moments displayed. Moments only appear when manually searching, making the app feel empty and broken.
+
+**Expected Behavior:**
+When users open the map, it should automatically load and display all moments within a specific radius (50km) of their current location. Users should immediately see nearby moments as markers on the map.
+
+**Implementation Required:**
+
+**File: public/js/map.js**
+
+Find the map initialization code and add automatic moment loading:
+
+```javascript
+// After user location is obtained (in watchPosition or getCurrentPosition callback)
+async function loadNearbyMoments(userLat, userLng, radiusKm = 50) {
+  try {
+    // Calculate bounding box for radius
+    // 1 degree latitude ≈ 111km
+    const latDelta = radiusKm / 111;
+    const lngDelta = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
+    
+    const minLat = userLat - latDelta;
+    const maxLat = userLat + latDelta;
+    const minLng = userLng - lngDelta;
+    const maxLng = userLng + lngDelta;
+    
+    // Query Supabase for moments within bounding box
+    const { data: moments, error } = await supabase
+      .from('moments')
+      .select('*')
+      .gte('latitude', minLat)
+      .lte('latitude', maxLat)
+      .gte('longitude', minLng)
+      .lte('longitude', maxLng)
+      .gt('ends_at', new Date().toISOString()) // Only active moments
+      .eq('hidden', false) // Not hidden/flagged
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    console.log(`Found ${moments.length} nearby moments`);
+    
+    // Display moments on map
+    moments.forEach(moment => {
+      addMomentMarker(moment);
+    });
+    
+  } catch (error) {
+    console.error('Error loading nearby moments:', error);
+  }
+}
+
+// Call this function when map loads and user location is obtained
+map.on('load', () => {
+  navigator.geolocation.getCurrentPosition((position) => {
+    const userLat = position.coords.latitude;
+    const userLng = position.coords.longitude;
+    
+    // Center map on user location
+    map.setCenter([userLng, userLat]);
+    map.setZoom(12);
+    
+    // Load nearby moments
+    loadNearbyMoments(userLat, userLng, 50); // 50km radius
+  });
+});
+```
+
+**Also add real-time updates for new moments:**
+```javascript
+// Subscribe to new moments being created
+const momentsSubscription = supabase
+  .channel('moments-changes')
+  .on('postgres_changes', {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'moments'
+  }, (payload) => {
+    console.log('New moment created:', payload.new);
+    // Check if new moment is within radius and add to map
+    const newMoment = payload.new;
+    // Calculate if within radius and add marker if yes
+    addMomentMarker(newMoment);
+  })
+  .subscribe();
+```
+
+---
+
+### Issue 2: No Way to Delete Moments
+
+**Current Problem:**
+Once a moment is created, there's no way to delete it. Users who create moments by mistake or need to cancel them have no option.
+
+**Expected Behavior:**
+- Moment creators should see a "Delete Moment" button on the moment detail page
+- Admins should also be able to delete any moment
+- Deleting should remove the moment from database and map
+- Participants should be notified if they're in a deleted moment
+
+**Implementation Required:**
+
+**File: public/moment.html**
+
+Add a delete button in the action buttons section (around line 47):
+
+```html
+<div class="action-buttons">
+  <button id="joinBtn" class="btn-primary hidden">Join Moment</button>
+  <button id="leaveBtn" class="btn-secondary hidden">Leave Moment</button>
+  <button id="chatBtn" class="btn-primary hidden">Open Chat</button>
+  
+  <!-- NEW: Delete button (only shown to creator/admin) -->
+  <button id="deleteBtn" class="btn-danger hidden">Delete Moment</button>
+</div>
+```
+
+**File: public/styles.css**
+
+Add styling for delete button:
+
+```css
+.btn-danger {
+  background: #ef4444;
+  color: var(--white);
+  padding: 11px 24px;
+  border-radius: 25px;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:active {
+  background: #dc2626;
+  transform: scale(0.96);
+}
+```
+
+**File: public/js/moment.js**
+
+Add delete functionality:
+
+```javascript
+// After loading moment details, check if user is creator or admin
+async function checkDeletePermission(momentData, userId) {
+  // Check if user is creator
+  if (momentData.created_by === userId) {
+    document.getElementById('deleteBtn').classList.remove('hidden');
+    return;
+  }
+  
+  // Check if user is admin
+  const { data: userRole } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+  
+  if (userRole && userRole.role === 'admin') {
+    document.getElementById('deleteBtn').classList.remove('hidden');
+  }
+}
+
+// Delete button handler
+document.getElementById('deleteBtn').addEventListener('click', async () => {
+  const confirmDelete = confirm('Are you sure you want to delete this moment? This action cannot be undone.');
+  
+  if (!confirmDelete) return;
+  
+  try {
+    const momentId = new URLSearchParams(window.location.search).get('id');
+    
+    // Delete moment from database
+    const { error } = await supabase
+      .from('moments')
+      .delete()
+      .eq('id', momentId);
+    
+    if (error) throw error;
+    
+    // Success - redirect back to map
+    alert('Moment deleted successfully');
+    window.location.href = '/';
+    
+  } catch (error) {
+    console.error('Error deleting moment:', error);
+    alert('Failed to delete moment: ' + error.message);
+  }
+});
+
+// Call checkDeletePermission when moment loads
+async function loadMomentDetails() {
+  // ... existing moment loading code ...
+  
+  const { data: user } = await supabase.auth.getUser();
+  if (user) {
+    await checkDeletePermission(momentData, user.user.id);
+  }
+}
+```
+
+**Also handle cascade deletions:**
+
+The database should automatically delete related records when a moment is deleted. Verify in Supabase that the `moments` table has proper foreign key constraints:
+
+- `moment_participants` should CASCADE DELETE when moment is deleted
+- `moment_messages` should CASCADE DELETE when moment is deleted
+
+If not set up, run this SQL in Supabase:
+
+```sql
+-- Update foreign key constraints to cascade delete
+ALTER TABLE moment_participants
+DROP CONSTRAINT IF EXISTS moment_participants_moment_id_fkey,
+ADD CONSTRAINT moment_participants_moment_id_fkey 
+  FOREIGN KEY (moment_id) 
+  REFERENCES moments(id) 
+  ON DELETE CASCADE;
+
+ALTER TABLE moment_messages
+DROP CONSTRAINT IF EXISTS moment_messages_moment_id_fkey,
+ADD CONSTRAINT moment_messages_moment_id_fkey 
+  FOREIGN KEY (moment_id) 
+  REFERENCES moments(id) 
+  ON DELETE CASCADE;
+```
+
+---
+
+### Testing Checklist
+
+**For Moments Display:**
+- [ ] Open map → Should immediately see nearby moments (if any exist within 50km)
+- [ ] Create a new moment → Should appear on map immediately
+- [ ] Move to different location → Should load moments for new area
+- [ ] No moments nearby → Map should be empty but not broken
+
+**For Delete Feature:**
+- [ ] Create a moment → See "Delete Moment" button on detail page
+- [ ] Click delete → Confirmation dialog appears
+- [ ] Confirm delete → Moment removed and redirected to map
+- [ ] Check database → Moment and related data deleted
+- [ ] View someone else's moment → No delete button shown (unless admin)
+- [ ] Admin account → Can delete any moment
+
+---
+
+**Files to Modify:**
+1. `public/js/map.js` - Add auto-load nearby moments on map initialization
+2. `public/moment.html` - Add delete button HTML
+3. `public/js/moment.js` - Add delete functionality and permission checking
+4. `public/styles.css` - Add .btn-danger styling
+5. Supabase database - Update foreign key constraints for cascade delete
+
+**Expected Result:**
+Users will see moments automatically when opening the map, and creators/admins can delete moments when needed.
+```
+
+---
+
+**Copy the entire prompt above and paste it into Replit AI Agent. It has everything needed to implement both features!**

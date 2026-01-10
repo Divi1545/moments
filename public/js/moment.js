@@ -106,6 +106,11 @@ async function loadMoment() {
     }
   }
 
+  // Check if user can delete (creator only)
+  if (moment.creator_id === currentUser.id) {
+    document.getElementById('deleteBtn').classList.remove('hidden');
+  }
+
   // Load participants
   await loadParticipants();
 
@@ -397,6 +402,40 @@ function setupEventListeners() {
   // Cancel SOS
   cancelSosBtn.addEventListener('click', () => {
     sosModal.classList.add('hidden');
+  });
+
+  // Delete button handler
+  const deleteBtn = document.getElementById('deleteBtn');
+  deleteBtn.addEventListener('click', async () => {
+    const confirmDelete = confirm('Are you sure you want to delete this moment? This action cannot be undone and will remove all participants and messages.');
+    
+    if (!confirmDelete) return;
+
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = 'Deleting...';
+
+    try {
+      // Delete moment from database (cascade will handle participants/messages)
+      const { error } = await supabase
+        .from('moments')
+        .delete()
+        .eq('id', momentId);
+
+      if (error) throw error;
+
+      showToast('Moment deleted successfully', 'success');
+      
+      // Redirect back to map
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error deleting moment:', error);
+      showToast('Failed to delete moment: ' + error.message, 'error');
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = '🗑️ Delete Moment';
+    }
   });
 }
 
