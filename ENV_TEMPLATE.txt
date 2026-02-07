@@ -1,0 +1,23 @@
+# =============================================================================
+# REPLIT SECRETS CONFIGURATION
+# =============================================================================
+# Add these as Secrets in Replit (Tools → Secrets or the lock icon in sidebar)
+#
+# HOW TO ADD SECRETS IN REPLIT:
+# 1. Click "Secrets" (lock icon) in left sidebar
+# 2. Click "New secret"
+# 3. Add each key-value pair below
+# =============================================================================
+
+# Supabase Configuration (from supabase.com dashboard)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+
+# Mapbox Configuration (from mapbox.com account)
+MAPBOX_TOKEN=your-mapbox-token-here
+
+# =============================================================================
+# NOTE: Do NOT use VITE_ prefix in Replit
+# Replit automatically injects secrets into window.ENV
+# =============================================================================
+
