@@ -624,7 +624,7 @@ REVOKE ALL ON FUNCTION expire_past_moments() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION expire_past_moments() TO service_role;
 
 -- ============================================================================
--- 11. SETUP INSTRUCTIONS
+-- 12. SETUP INSTRUCTIONS
 -- ============================================================================
 
 -- After running this migration:
@@ -656,6 +656,23 @@ GRANT EXECUTE ON FUNCTION expire_past_moments() TO service_role;
 -- Grant execute permissions on helper functions to authenticated users
 GRANT EXECUTE ON FUNCTION is_user_blocked(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION has_blocked_participants_in_moment(UUID, UUID) TO authenticated;
+
+-- ============================================================================
+-- 11. FIX POSTGIS SYSTEM TABLE RLS
+-- ============================================================================
+
+-- Enable RLS on PostGIS system table (fixes Security Advisor warning)
+ALTER TABLE spatial_ref_sys ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow public read access (it's reference data)
+DROP POLICY IF EXISTS "Allow public read access to spatial reference systems" ON spatial_ref_sys;
+CREATE POLICY "Allow public read access to spatial reference systems" 
+  ON spatial_ref_sys 
+  FOR SELECT 
+  USING (true);
+
+COMMENT ON POLICY "Allow public read access to spatial reference systems" ON spatial_ref_sys 
+  IS 'PostGIS spatial_ref_sys is read-only reference data - safe for public access';
 
 -- ============================================================================
 -- COMPLETE! ✅
