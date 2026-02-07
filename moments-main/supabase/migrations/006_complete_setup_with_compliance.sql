@@ -658,23 +658,6 @@ GRANT EXECUTE ON FUNCTION is_user_blocked(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION has_blocked_participants_in_moment(UUID, UUID) TO authenticated;
 
 -- ============================================================================
--- 11. FIX POSTGIS SYSTEM TABLE RLS
--- ============================================================================
-
--- Enable RLS on PostGIS system table (fixes Security Advisor warning)
-ALTER TABLE spatial_ref_sys ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow public read access (it's reference data)
-DROP POLICY IF EXISTS "Allow public read access to spatial reference systems" ON spatial_ref_sys;
-CREATE POLICY "Allow public read access to spatial reference systems" 
-  ON spatial_ref_sys 
-  FOR SELECT 
-  USING (true);
-
-COMMENT ON POLICY "Allow public read access to spatial reference systems" ON spatial_ref_sys 
-  IS 'PostGIS spatial_ref_sys is read-only reference data - safe for public access';
-
--- ============================================================================
 -- COMPLETE! ✅
 -- ============================================================================
 
@@ -699,8 +682,12 @@ BEGIN
   RAISE NOTICE '  ✅ Geospatial search';
   RAISE NOTICE '  ✅ SOS safety alerts';
   RAISE NOTICE '  ✅ Row-level security on all tables';
+  RAISE NOTICE '  ✅ Infinite recursion fix applied';
   RAISE NOTICE '';
   RAISE NOTICE 'Next steps: See setup instructions above';
+  RAISE NOTICE '';
+  RAISE NOTICE 'Note: Security Advisor may show warning for spatial_ref_sys';
+  RAISE NOTICE '      This is a PostGIS system table and can be safely ignored';
 END $$;
 
 SELECT '✅ All tables, functions, and policies ready!' as status;

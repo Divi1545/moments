@@ -3,41 +3,43 @@
 ## RLS on PostGIS System Table (spatial_ref_sys)
 
 ### Issue
-Supabase Security Advisor flagged: "RLS Disabled in Public" for the `public.spatial_ref_sys` table.
+Supabase Security Advisor shows warning: "RLS Disabled in Public" for the `public.spatial_ref_sys` table.
 
 ### Root Cause
-When the PostGIS extension is enabled, it creates the `spatial_ref_sys` system table without Row-Level Security (RLS) enabled. Supabase requires RLS on all public tables.
+When the PostGIS extension is enabled, it creates the `spatial_ref_sys` system table without Row-Level Security (RLS) enabled. The table is owned by the postgres superuser, not by the database user.
 
-### Solution
-```sql
--- Enable RLS on PostGIS system table
-ALTER TABLE spatial_ref_sys ENABLE ROW LEVEL SECURITY;
+### Why This Cannot Be Fixed
+**ERROR: 42501: must be owner of table spatial_ref_sys**
 
--- Create policy to allow public read access (it's reference data)
-CREATE POLICY "Allow public read access to spatial reference systems" 
-  ON spatial_ref_sys 
-  FOR SELECT 
-  USING (true);
-```
+In Supabase's managed environment:
+- `spatial_ref_sys` is a PostGIS system table
+- It's owned by the postgres superuser
+- Users don't have permission to ALTER system tables
+- This is by design for security and stability
 
-### Why This is Safe
-- `spatial_ref_sys` is a PostGIS system table containing coordinate reference system data
-- It's read-only reference data (EPSG codes, projection parameters, etc.)
-- No user-generated content or sensitive information
-- Standard practice is to allow public read access
-- The table is managed by PostGIS, not by application code
+### Resolution
+**This Security Advisor warning can be safely ignored** because:
+- `spatial_ref_sys` is a PostGIS system table, not user data
+- Contains read-only EPSG coordinate reference data
+- No sensitive information or user-generated content
+- Standard PostGIS installation behavior
+- Cannot be modified in managed database environments
+
+### Workaround
+None needed. The warning is cosmetic and does not represent a security risk.
 
 ### Impact
-- ✅ Resolves Security Advisor error
-- ✅ Maintains full app functionality
-- ✅ No performance impact
-- ✅ Complies with Supabase security best practices
+- ⚠️ Security Advisor shows 1 warning (expected behavior)
+- ✅ No actual security risk
+- ✅ Full app functionality maintained
+- ✅ Standard for all PostGIS-enabled Supabase databases
 
-### Date Fixed
+### Date Investigated
 February 7, 2026
 
-### Related Files
-- `supabase/migrations/006_complete_setup_with_compliance.sql` (Section 11)
+### Related Documentation
+- PostGIS documentation: spatial_ref_sys is a system catalog table
+- Supabase limitation: Cannot modify ownership of extension-created tables
 
 ---
 
