@@ -192,6 +192,27 @@ SET search_path = public, pg_temp;
 
 COMMENT ON FUNCTION is_user_blocked IS 'Check if one user has blocked another';
 
+-- Check if moment has blocked participants (SECURITY DEFINER to avoid RLS recursion)
+CREATE OR REPLACE FUNCTION has_blocked_participants_in_moment(
+  check_moment_id UUID,
+  check_user_id UUID
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM moment_participants mp2
+    JOIN blocked_users bu ON (
+      (bu.blocker_id = check_user_id AND bu.blocked_id = mp2.user_id)
+      OR (bu.blocker_id = mp2.user_id AND bu.blocked_id = check_user_id)
+    )
+    WHERE mp2.moment_id = check_moment_id
+  );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp;
+
+COMMENT ON FUNCTION has_blocked_participants_in_moment IS 'Check if moment contains blocked participants (bypasses RLS to prevent recursion)';
+
 -- Get moment context (badges)
 CREATE OR REPLACE FUNCTION get_moment_context(moment_uuid UUID)
 RETURNS JSON AS $$
@@ -457,14 +478,7 @@ CREATE POLICY "Read participants" ON moment_participants FOR SELECT USING (
 
 CREATE POLICY "Users join moments" ON moment_participants FOR INSERT WITH CHECK (
   auth.uid() = user_id
-  AND NOT EXISTS (
-    SELECT 1 FROM moment_participants mp2
-    JOIN blocked_users bu ON (
-      (bu.blocker_id = auth.uid() AND bu.blocked_id = mp2.user_id)
-      OR (bu.blocker_id = mp2.user_id AND bu.blocked_id = auth.uid())
-    )
-    WHERE mp2.moment_id = moment_participants.moment_id
-  )
+  AND NOT has_blocked_participants_in_moment(moment_id, auth.uid())
 );
 
 CREATE POLICY "Users leave moments" ON moment_participants FOR DELETE USING (auth.uid() = user_id);
@@ -636,6 +650,14 @@ GRANT EXECUTE ON FUNCTION expire_past_moments() TO service_role;
 --    - public/guidelines.html
 
 -- ============================================================================
+-- 10. GRANT FUNCTION PERMISSIONS
+-- ============================================================================
+
+-- Grant execute permissions on helper functions to authenticated users
+GRANT EXECUTE ON FUNCTION is_user_blocked(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION has_blocked_participants_in_moment(UUID, UUID) TO authenticated;
+
+-- ============================================================================
 -- COMPLETE! ✅
 -- ============================================================================
 
@@ -648,9 +670,10 @@ BEGIN
   RAISE NOTICE '  - moment_photos, sos_alerts, flags, user_roles';
   RAISE NOTICE '  - blocked_users (Apple 1.2 compliance)';
   RAISE NOTICE '';
-  RAISE NOTICE 'Functions created: 6';
+  RAISE NOTICE 'Functions created: 7';
   RAISE NOTICE '  - get_moment_context, get_nearby_moments, search_moments';
-  RAISE NOTICE '  - check_user_active_hosted_moment, is_user_blocked, expire_past_moments';
+  RAISE NOTICE '  - check_user_active_hosted_moment, is_user_blocked';
+  RAISE NOTICE '  - has_blocked_participants_in_moment, expire_past_moments';
   RAISE NOTICE '';
   RAISE NOTICE 'Features:';
   RAISE NOTICE '  ✅ User blocking system';
