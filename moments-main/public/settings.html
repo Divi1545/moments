@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Settings - Moments</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <button id="backBtn" class="btn-back">← Back</button>
+      <h1>Settings</h1>
+      <div style="width: 40px;"></div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container" style="padding: 20px; max-width: 600px; margin: 0 auto;">
+      
+      <!-- Profile Section -->
+      <section class="settings-section">
+        <h2>Profile</h2>
+        <div id="profileInfo" class="info-card">
+          <div class="profile-display">
+            <div id="profileAvatar" class="profile-avatar-large"></div>
+            <div>
+              <p><strong id="displayName"></strong></p>
+              <p style="font-size: 14px; color: var(--gray-600);" id="userType"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Blocked Users Section -->
+      <section class="settings-section">
+        <h2>Blocked Users</h2>
+        <p style="font-size: 14px; color: var(--gray-600); margin-bottom: 15px;">
+          Blocked users can't see your messages or join the same moments as you.
+        </p>
+        <div id="blockedUsersList" class="blocked-users-list">
+          <div class="loader-small">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Support Section -->
+      <section class="settings-section">
+        <h2>Help & Support</h2>
+        <a href="support.html" class="settings-link">Contact Support</a>
+        <a href="guidelines.html" class="settings-link">Community Guidelines</a>
+      </section>
+
+      <!-- Account Section -->
+      <section class="settings-section">
+        <h2>Account</h2>
+        <button id="signOutBtn" class="btn-secondary" style="width: 100%;">Sign Out</button>
+      </section>
+
+    </main>
+
+    <!-- Loading State -->
+    <div id="loader" class="loader">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/config.js"></script>
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>

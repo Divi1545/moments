@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Moment Chat</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <button id="backBtn" class="btn-back">← Back</button>
+      <div class="chat-header-info">
+        <h2 id="momentTitle"></h2>
+        <span id="participantCount" class="participant-badge"></span>
+      </div>
+      <button id="infoBtn" class="btn-icon">ℹ️</button>
+    </header>
+
+    <!-- Chat Messages -->
+    <main class="chat-container">
+      <div id="messagesList" class="messages-list"></div>
+      
+      <!-- Typing Indicator -->
+      <div id="typingIndicator" class="typing-indicator hidden">
+        <span></span><span></span><span></span>
+      </div>
+    </main>
+
+    <!-- Message Input -->
+    <footer class="chat-footer">
+      <form id="messageForm" class="message-form">
+        <input 
+          type="file" 
+          id="chatImageInput" 
+          accept="image/jpeg,image/png" 
+          class="hidden"
+        >
+        <button type="button" id="uploadImageBtn" class="btn-upload-image" title="Upload ephemeral image">
+          📷
+        </button>
+        <input 
+          type="text" 
+          id="messageInput" 
+          placeholder="Type a message..." 
+          maxlength="500" 
+          required
+        >
+        <button type="submit" class="btn-send">Send</button>
+      </form>
+      <div id="imagePreviewContainer" class="image-preview-container hidden">
+        <img id="imagePreview" class="image-preview" alt="Preview">
+        <button type="button" id="removeImageBtn" class="btn-remove-image">✕</button>
+        <span class="ephemeral-badge">⏱️ Disappears in 5 min</span>
+      </div>
+    </footer>
+
+    <!-- Loading State -->
+    <div id="loader" class="loader">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="error-state hidden">
+      <p id="errorMessage"></p>
+      <button onclick="history.back()" class="btn-secondary">Go Back</button>
+    </div>
+
+    <!-- Flag Message Modal -->
+    <div id="flagModal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-btn" id="closeFlagModal">&times;</button>
+        <h2>Report Message</h2>
+        <form id="flagForm">
+          <label>Reason:</label>
+          <select id="flagReason" required>
+            <option value="">Select a reason</option>
+            <option value="spam">Spam</option>
+            <option value="inappropriate">Inappropriate content</option>
+            <option value="harassment">Harassment</option>
+            <option value="other">Other</option>
+          </select>
+          <button type="submit" class="btn-primary">Submit Report</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Block User Modal -->
+    <div id="blockModal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-btn" id="closeBlockModal">&times;</button>
+        <h2>Block User</h2>
+        <p>Are you sure you want to block <strong id="blockUserName"></strong>?</p>
+        <p style="font-size: 14px; color: var(--gray-600); margin: 10px 0;">
+          Blocked users won't be able to see your messages or join the same moments as you.
+        </p>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button id="confirmBlockBtn" class="btn-primary">Block User</button>
+          <button id="cancelBlockBtn" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/config.js"></script>
+  <script type="module" src="js/chat.js"></script>
+  
+  <script>
+    // Add support link to header info button
+    const infoBtn = document.getElementById('infoBtn');
+    if (infoBtn) {
+      const originalClick = infoBtn.onclick;
+      infoBtn.title = 'Moment Info & Support';
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Admin Dashboard - Moments</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <button id="backBtn" class="btn-back">← Back</button>
+      <h1>Admin Dashboard</h1>
+      <button id="refreshBtn" class="btn-icon">🔄</button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container" style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+      
+      <!-- Stats Overview -->
+      <section class="admin-section">
+        <h2>📊 Overview</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="totalFlags">0</div>
+            <div class="stat-label">Total Flags</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="pendingFlags">0</div>
+            <div class="stat-label">Pending Review</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="hiddenMoments">0</div>
+            <div class="stat-label">Hidden Moments</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="totalBlocks">0</div>
+            <div class="stat-label">User Blocks</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Filters -->
+      <section class="admin-section">
+        <div class="filter-bar">
+          <select id="filterType" class="filter-select">
+            <option value="all">All Content</option>
+            <option value="moment">Moments Only</option>
+            <option value="message">Messages Only</option>
+          </select>
+          <select id="filterReason" class="filter-select">
+            <option value="all">All Reasons</option>
+            <option value="spam">Spam</option>
+            <option value="inappropriate">Inappropriate</option>
+            <option value="harassment">Harassment</option>
+            <option value="other">Other</option>
+          </select>
+          <button id="applyFilters" class="btn-secondary">Apply Filters</button>
+        </div>
+      </section>
+
+      <!-- Flagged Content List -->
+      <section class="admin-section">
+        <h2>🚩 Flagged Content</h2>
+        <div id="flaggedContentList" class="flagged-content-list">
+          <div class="loader-small">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Loading State -->
+    <div id="loader" class="loader">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Action Modal -->
+    <div id="actionModal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-btn" id="closeActionModal">&times;</button>
+        <h2>Moderate Content</h2>
+        <div id="contentPreview" class="content-preview"></div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+          <button id="hideContentBtn" class="btn-primary">Hide Content</button>
+          <button id="deleteContentBtn" class="btn-danger">Delete Content</button>
+          <button id="dismissFlagBtn" class="btn-secondary">Dismiss Flag</button>
+          <button id="banUserBtn" class="btn-danger">Ban User</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="js/config.js"></script>
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>
