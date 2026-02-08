@@ -110,14 +110,15 @@ async function loadMoment() {
   const isCreator = moment.creator_id === currentUser.id;
   let isAdmin = false;
   
-  // Check if user is admin
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('user_type')
-    .eq('id', currentUser.id)
-    .single();
+  // Check if user is admin via user_roles table
+  const { data: adminRole } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', currentUser.id)
+    .eq('role', 'admin')
+    .maybeSingle();
   
-  if (profile && profile.user_type === 'admin') {
+  if (adminRole) {
     isAdmin = true;
   }
   
