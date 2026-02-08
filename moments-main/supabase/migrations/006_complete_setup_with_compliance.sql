@@ -213,6 +213,21 @@ SET search_path = public, pg_temp;
 
 COMMENT ON FUNCTION has_blocked_participants_in_moment IS 'Check if moment contains blocked participants (bypasses RLS to prevent recursion)';
 
+-- Check if user is admin (SECURITY DEFINER to avoid RLS recursion on user_roles)
+CREATE OR REPLACE FUNCTION is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid() 
+    AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp;
+
+COMMENT ON FUNCTION is_admin IS 'Check if current user is an admin (bypasses RLS to prevent recursion)';
+
 -- Get moment context (badges)
 CREATE OR REPLACE FUNCTION get_moment_context(moment_uuid UUID)
 RETURNS JSON AS $$
@@ -372,7 +387,8 @@ CREATE OR REPLACE FUNCTION auto_join_creator()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO moment_participants (moment_id, user_id)
-  VALUES (NEW.id, NEW.creator_id);
+  VALUES (NEW.id, NEW.creator_id)
+  ON CONFLICT (moment_id, user_id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -550,7 +566,7 @@ CREATE POLICY "Admins read flags" ON flags FOR SELECT USING (
 DROP POLICY IF EXISTS "Admins manage roles" ON user_roles;
 
 CREATE POLICY "Admins manage roles" ON user_roles FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  is_admin()
 );
 
 -- BLOCKED USERS POLICIES (NEW - Apple 1.2 Compliance)
@@ -618,6 +634,7 @@ GRANT EXECUTE ON FUNCTION get_nearby_moments TO authenticated;
 GRANT EXECUTE ON FUNCTION search_moments TO authenticated;
 GRANT EXECUTE ON FUNCTION check_user_active_hosted_moment TO authenticated;
 GRANT EXECUTE ON FUNCTION is_user_blocked TO authenticated;
+GRANT EXECUTE ON FUNCTION is_admin TO authenticated;
 
 -- Service role only functions
 REVOKE ALL ON FUNCTION expire_past_moments() FROM PUBLIC;
@@ -656,6 +673,7 @@ GRANT EXECUTE ON FUNCTION expire_past_moments() TO service_role;
 -- Grant execute permissions on helper functions to authenticated users
 GRANT EXECUTE ON FUNCTION is_user_blocked(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION has_blocked_participants_in_moment(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION is_admin() TO authenticated;
 
 -- ============================================================================
 -- COMPLETE! ✅
