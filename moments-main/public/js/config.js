@@ -1,77 +1,45 @@
 // ============================================================================
-// Supabase Client Configuration
+// Supabase Client Configuration  
 // ============================================================================
 
-// Global variables to store config
-let SUPABASE_URL = '';
-let SUPABASE_ANON_KEY = '';
-let MAPBOX_TOKEN = '';
-let supabase = null;
+// Try multiple methods to get environment variables
+const SUPABASE_URL = window.ENV?.SUPABASE_URL || 
+                      window.__ENV__?.SUPABASE_URL || 
+                      'https://eolomggmsvfbiyiqqbfl.supabase.co';
 
-// Fetch configuration from server
-async function loadConfig() {
-  try {
-    console.log('Fetching configuration from /api/config...');
-    const response = await fetch('/api/config');
-    
-    if (!response.ok) {
-      throw new Error(`Failed to load config: ${response.status}`);
-    }
-    
-    const config = await response.json();
-    
-    SUPABASE_URL = config.SUPABASE_URL || '';
-    SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY || '';
-    MAPBOX_TOKEN = config.MAPBOX_TOKEN || '';
-    
-    console.log('✅ Configuration loaded from server');
-    console.log('Supabase URL:', SUPABASE_URL || '❌ MISSING');
-    console.log('Supabase Key:', SUPABASE_ANON_KEY ? `✅ Set (${SUPABASE_ANON_KEY.substring(0, 20)}...)` : '❌ MISSING');
-    console.log('Mapbox Token:', MAPBOX_TOKEN ? '✅ Set' : '⚠️ Not set (optional)');
-    
-    // Validate required environment variables
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.error('❌ Missing required Supabase credentials!');
-      throw new Error('Configuration error: Missing Supabase credentials');
-    }
-    
-    // Initialize Supabase client
-    const { createClient } = window.supabase;
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
-    console.log('✅ Supabase client initialized successfully');
-    
-    return { supabase, mapboxToken: MAPBOX_TOKEN };
-    
-  } catch (error) {
-    console.error('❌ Failed to load configuration:', error);
-    alert('Configuration Error: Unable to load app configuration. Please contact support.');
-    throw error;
-  }
+const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || 
+                           window.__ENV__?.SUPABASE_ANON_KEY || 
+                           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbG9tZ2dtc3ZmYml5aXFxYmZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgxNDEzNTUsImV4cCI6MjA1MzcxNzM1NX0.qH8Mc3uJPj4d6h2hKrHpeCdXXzBOk5hTcQVLQZhDRzY';
+
+const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || 
+                      window.__ENV__?.MAPBOX_TOKEN || 
+                      '';
+
+// Debug logging
+console.log('=== Configuration Debug ===');
+console.log('window.ENV:', window.ENV);
+console.log('SUPABASE_URL:', SUPABASE_URL);
+console.log('SUPABASE_ANON_KEY:', SUPABASE_ANON_KEY ? `Set (${SUPABASE_ANON_KEY.substring(0, 20)}...)` : 'NOT SET');
+console.log('=========================');
+
+// Validate required environment variables
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ Missing Supabase environment variables!');
+  alert('Configuration Error: Missing Supabase credentials');
+  throw new Error('Configuration error: Missing Supabase credentials');
 }
 
-// Export a promise that resolves when config is loaded
-export const configPromise = loadConfig();
+// Initialize Supabase client
+const { createClient } = window.supabase;
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Export getter functions that wait for config
-export async function getSupabase() {
-  await configPromise;
-  return supabase;
-}
+console.log('✅ Supabase client initialized successfully');
 
-export async function getMapboxToken() {
-  await configPromise;
-  return MAPBOX_TOKEN;
-}
-
-// For backward compatibility - export supabase directly
-// Note: This will be null until configPromise resolves
-export { supabase };
+export const mapboxToken = MAPBOX_TOKEN;
 
 // Helper: Get current user
 export async function getCurrentUser() {
-  const client = await getSupabase();
-  const { data: { user }, error } = await client.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
   if (error) {
     console.error('Error getting user:', error);
     return null;
@@ -81,8 +49,7 @@ export async function getCurrentUser() {
 
 // Helper: Get user profile
 export async function getUserProfile(userId) {
-  const client = await getSupabase();
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
@@ -97,8 +64,7 @@ export async function getUserProfile(userId) {
 
 // Helper: Check if profile exists
 export async function checkProfileExists(userId) {
-  const client = await getSupabase();
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('id', userId)
