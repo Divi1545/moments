@@ -2,39 +2,76 @@
 // Supabase Client Configuration
 // ============================================================================
 
-// Environment variables (injected by server)
-console.log('window.ENV object:', window.ENV);
+// Global variables to store config
+let SUPABASE_URL = '';
+let SUPABASE_ANON_KEY = '';
+let MAPBOX_TOKEN = '';
+let supabase = null;
 
-const SUPABASE_URL = window.ENV?.SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || '';
-const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || '';
-
-// Debug: Log environment status
-console.log('Config.js - Supabase URL:', SUPABASE_URL || 'EMPTY STRING');
-console.log('Config.js - Supabase Key:', SUPABASE_ANON_KEY ? 'Set (' + SUPABASE_ANON_KEY.substring(0, 20) + '...)' : 'EMPTY STRING');
-console.log('Config.js - Mapbox Token:', MAPBOX_TOKEN ? 'Set' : 'EMPTY STRING');
-
-// Validate required environment variables
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('❌ Missing Supabase environment variables!');
-  console.error('SUPABASE_URL:', SUPABASE_URL || 'NOT SET');
-  console.error('SUPABASE_ANON_KEY:', SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
-  alert('Configuration Error: Supabase credentials are missing. Please check Vercel environment variables and redeploy.');
-  throw new Error('Configuration error: Missing Supabase credentials');
+// Fetch configuration from server
+async function loadConfig() {
+  try {
+    console.log('Fetching configuration from /api/config...');
+    const response = await fetch('/api/config');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load config: ${response.status}`);
+    }
+    
+    const config = await response.json();
+    
+    SUPABASE_URL = config.SUPABASE_URL || '';
+    SUPABASE_ANON_KEY = config.SUPABASE_ANON_KEY || '';
+    MAPBOX_TOKEN = config.MAPBOX_TOKEN || '';
+    
+    console.log('✅ Configuration loaded from server');
+    console.log('Supabase URL:', SUPABASE_URL || '❌ MISSING');
+    console.log('Supabase Key:', SUPABASE_ANON_KEY ? `✅ Set (${SUPABASE_ANON_KEY.substring(0, 20)}...)` : '❌ MISSING');
+    console.log('Mapbox Token:', MAPBOX_TOKEN ? '✅ Set' : '⚠️ Not set (optional)');
+    
+    // Validate required environment variables
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error('❌ Missing required Supabase credentials!');
+      throw new Error('Configuration error: Missing Supabase credentials');
+    }
+    
+    // Initialize Supabase client
+    const { createClient } = window.supabase;
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    console.log('✅ Supabase client initialized successfully');
+    
+    return { supabase, mapboxToken: MAPBOX_TOKEN };
+    
+  } catch (error) {
+    console.error('❌ Failed to load configuration:', error);
+    alert('Configuration Error: Unable to load app configuration. Please contact support.');
+    throw error;
+  }
 }
 
-// Initialize Supabase client - simple, no extra options
-const { createClient } = window.supabase;
+// Export a promise that resolves when config is loaded
+export const configPromise = loadConfig();
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Export getter functions that wait for config
+export async function getSupabase() {
+  await configPromise;
+  return supabase;
+}
 
-console.log('Supabase client initialized successfully');
+export async function getMapboxToken() {
+  await configPromise;
+  return MAPBOX_TOKEN;
+}
 
-export const mapboxToken = MAPBOX_TOKEN;
+// For backward compatibility - export supabase directly
+// Note: This will be null until configPromise resolves
+export { supabase };
 
 // Helper: Get current user
 export async function getCurrentUser() {
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const client = await getSupabase();
+  const { data: { user }, error } = await client.auth.getUser();
   if (error) {
     console.error('Error getting user:', error);
     return null;
@@ -44,7 +81,8 @@ export async function getCurrentUser() {
 
 // Helper: Get user profile
 export async function getUserProfile(userId) {
-  const { data, error } = await supabase
+  const client = await getSupabase();
+  const { data, error } = await client
     .from('profiles')
     .select('*')
     .eq('id', userId)
@@ -59,7 +97,8 @@ export async function getUserProfile(userId) {
 
 // Helper: Check if profile exists
 export async function checkProfileExists(userId) {
-  const { data, error } = await supabase
+  const client = await getSupabase();
+  const { data, error } = await client
     .from('profiles')
     .select('id')
     .eq('id', userId)
