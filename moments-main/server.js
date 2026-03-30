@@ -19,13 +19,26 @@ app.use((req, res, next) => {
 
 // Inject environment variables into HTML
 app.use((req, res, next) => {
-  if (req.path.endsWith('.html') || req.path === '/') {
-    const filePath = req.path === '/' ? 
-      path.join(__dirname, 'public', 'index.html') : 
-      path.join(__dirname, 'public', req.path);
+  // Handle HTML requests
+  if (req.path.endsWith('.html') || req.path === '/' || req.path.match(/^\/[^.]+$/)) {
+    let htmlPath = req.path === '/' ? '/index.html' : req.path;
+    
+    // Add .html extension if missing
+    if (!htmlPath.endsWith('.html')) {
+      htmlPath += '.html';
+    }
+    
+    const filePath = path.join(__dirname, 'public', htmlPath);
+    
+    console.log('Trying to read:', filePath);
+    console.log('Environment check:', {
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'MISSING',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? 'SET' : 'MISSING'
+    });
     
     // Check if file exists first
     if (!fs.existsSync(filePath)) {
+      console.log('File not found:', filePath);
       return next();
     }
     
@@ -41,16 +54,18 @@ app.use((req, res, next) => {
           window.ENV = {
             SUPABASE_URL: '${process.env.SUPABASE_URL || ''}',
             SUPABASE_ANON_KEY: '${process.env.SUPABASE_ANON_KEY || ''}',
-            MAPBOX_TOKEN: '${process.env.MAPBOX_TOKEN || ''}'
+            MAPBOX_TOKEN: '${process.env.MAPBOX_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''}'
           };
-          console.log('Environment variables injected by server');
-          console.log('Supabase URL:', window.ENV.SUPABASE_URL ? 'Set' : 'Missing');
-          console.log('Supabase Key:', window.ENV.SUPABASE_ANON_KEY ? 'Set' : 'Missing');
+          console.log('✅ Environment variables injected by server');
+          console.log('Supabase URL:', window.ENV.SUPABASE_URL || 'MISSING');
+          console.log('Supabase Key:', window.ENV.SUPABASE_ANON_KEY ? 'Set (' + window.ENV.SUPABASE_ANON_KEY.substring(0, 20) + '...)' : 'MISSING');
+          console.log('Mapbox Token:', window.ENV.MAPBOX_TOKEN ? 'Set' : 'MISSING');
         </script>
       `;
       
       const modifiedHtml = html.replace('</head>', envScript + '</head>');
-      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.send(modifiedHtml);
     });
   } else {

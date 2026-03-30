@@ -2,25 +2,33 @@
 // Supabase Client Configuration
 // ============================================================================
 
-// Environment variables (set in Replit Secrets)
-// Replit injects secrets as window.ENV object
-const SUPABASE_URL = window.ENV?.SUPABASE_URL || 
-                     'YOUR_SUPABASE_URL';
+// Environment variables (injected by server)
+console.log('window.ENV object:', window.ENV);
 
-const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || 
-                          'YOUR_SUPABASE_ANON_KEY';
+const SUPABASE_URL = window.ENV?.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = window.ENV?.SUPABASE_ANON_KEY || '';
+const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || '';
 
-const MAPBOX_TOKEN = window.ENV?.MAPBOX_TOKEN || 
-                     'YOUR_MAPBOX_TOKEN';
+// Debug: Log environment status
+console.log('Config.js - Supabase URL:', SUPABASE_URL || 'EMPTY STRING');
+console.log('Config.js - Supabase Key:', SUPABASE_ANON_KEY ? 'Set (' + SUPABASE_ANON_KEY.substring(0, 20) + '...)' : 'EMPTY STRING');
+console.log('Config.js - Mapbox Token:', MAPBOX_TOKEN ? 'Set' : 'EMPTY STRING');
 
-// Initialize Supabase client
-export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-});
+// Validate required environment variables
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ Missing Supabase environment variables!');
+  console.error('SUPABASE_URL:', SUPABASE_URL || 'NOT SET');
+  console.error('SUPABASE_ANON_KEY:', SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
+  alert('Configuration Error: Supabase credentials are missing. Please check Vercel environment variables and redeploy.');
+  throw new Error('Configuration error: Missing Supabase credentials');
+}
+
+// Initialize Supabase client - simple, no extra options
+const { createClient } = window.supabase;
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+console.log('Supabase client initialized successfully');
 
 export const mapboxToken = MAPBOX_TOKEN;
 
