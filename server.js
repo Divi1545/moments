@@ -83,21 +83,19 @@ app.use((req, res, next) => {
 // Serve static files from 'public' directory
 app.use(express.static('public'));
 
-// Port from Replit or default to 5000
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
+function logStartup() {
   console.log(`✅ Moments MVP running on port ${PORT}`);
   console.log(`🌐 Local: http://localhost:${PORT}`);
-  
+
   if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
     console.log(`📱 Replit URL: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
   }
-  
-  // Check if environment variables are set
+
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.MAPBOX_TOKEN) {
     console.warn('⚠️  WARNING: Environment variables not set!');
-    console.warn('Add these in Replit Secrets:');
+    console.warn('Add these in Replit Secrets / Vercel env:');
     console.warn('  - SUPABASE_URL');
     console.warn('  - SUPABASE_ANON_KEY');
     console.warn('  - MAPBOX_TOKEN');
@@ -107,5 +105,11 @@ app.listen(PORT, '0.0.0.0', () => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('⚠️  SUPABASE_SERVICE_ROLE_KEY not set — IslandLoaf /api/moments/* will fail');
   }
-});
+}
 
+// Vercel invokes `api/index.js` (no listen). Local/dev runs this file directly.
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', logStartup);
+}
