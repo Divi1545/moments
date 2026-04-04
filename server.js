@@ -17,6 +17,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Browser env (used on Vercel where static HTML does not get Express injection)
+function serveBrowserEnv(req, res) {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  const env = {
+    SUPABASE_URL: process.env.SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
+    MAPBOX_TOKEN: process.env.MAPBOX_TOKEN || '',
+    PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL || '',
+  };
+  res.status(200).send(`window.ENV=${JSON.stringify(env)};`);
+}
+app.get('/api/env', serveBrowserEnv);
+app.get('/api/env.js', serveBrowserEnv);
+
 // Inject environment variables into HTML
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') || req.path === '/') {
@@ -35,7 +50,8 @@ app.use((req, res, next) => {
           window.ENV = {
             SUPABASE_URL: '${process.env.SUPABASE_URL || ''}',
             SUPABASE_ANON_KEY: '${process.env.SUPABASE_ANON_KEY || ''}',
-            MAPBOX_TOKEN: '${process.env.MAPBOX_TOKEN || ''}'
+            MAPBOX_TOKEN: '${process.env.MAPBOX_TOKEN || ''}',
+            PUBLIC_SITE_URL: '${process.env.PUBLIC_SITE_URL || ''}'
           };
         </script>
       `;
