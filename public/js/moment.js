@@ -8,6 +8,11 @@ let momentId = null;
 let currentUser = null;
 let isParticipant = false;
 
+function formatCoord(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(5) : '—';
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(window.location.search);
@@ -16,6 +21,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!momentId) {
     showError('Invalid moment ID');
     return;
+  }
+
+  // IslandLoaf Stay — guest links (join API adds open=chat to jump to chat)
+  const guestParam = params.get('guest');
+  if (guestParam) {
+    try {
+      const r = await fetch(`/api/moments/guest/verify?token=${encodeURIComponent(guestParam)}`);
+      const data = await r.json();
+      if (!r.ok || !data.valid || data.moment_id !== momentId) {
+        showError(data.error || 'Invalid or expired guest link');
+        return;
+      }
+      if (params.get('open') === 'chat') {
+        window.location.replace(
+          `chat.html?id=${encodeURIComponent(momentId)}&guest=${encodeURIComponent(guestParam)}`
+        );
+        return;
+      }
+      await loadMomentGuestDetail(guestParam);
+      setupGuestDetailListeners();
+      return;
+    } catch (e) {
+      console.error(e);
+      showError('Could not verify guest link');
+      return;
+    }
   }
 
   currentUser = await getCurrentUser();
@@ -71,7 +102,7 @@ async function loadMoment() {
   // Display moment
   document.getElementById('momentTitle').textContent = moment.title;
   document.getElementById('momentLocation').textContent = 
-    `${moment.lat.toFixed(5)}, ${moment.lng.toFixed(5)}`;
+    `${formatCoord(moment.lat)}, ${formatCoord(moment.lng)}`;
   document.getElementById('momentTime').textContent = 
     `${formatDateTime(moment.starts_at)} - ${formatDateTime(moment.ends_at)}`;
   document.getElementById('participantCount').textContent = 
@@ -226,6 +257,63 @@ async function loadParticipants() {
     
     listContainer.appendChild(item);
   });
+}
+
+// Guest (IslandLoaf Stay) — read-only detail, no Supabase auth
+async function loadMomentGuestDetail(guestToken) {
+  const loader = document.getElementById('loader');
+  const content = document.getElementById('momentContent');
+
+  const { data: moment, error } = await supabase
+    .from('moments')
+    .select('*')
+    .eq('id', momentId)
+    .single();
+
+  if (error || !moment) {
+    showError('Moment not found');
+    return;
+  }
+
+  const { count: pc } = await supabase
+    .from('moment_participants')
+    .select('*', { count: 'exact', head: true })
+    .eq('moment_id', momentId);
+
+  await loadPreviewPhotos();
+
+  document.getElementById('momentTitle').textContent = moment.title;
+  document.getElementById('momentLocation').textContent =
+    `${formatCoord(moment.lat)}, ${formatCoord(moment.lng)}`;
+  document.getElementById('momentTime').textContent =
+    `${formatDateTime(moment.starts_at)} - ${formatDateTime(moment.ends_at)}`;
+  document.getElementById('participantCount').textContent =
+    `${pc || 0}/${moment.max_participants} participants`;
+
+  document.getElementById('contextBadges').innerHTML = '';
+
+  ['joinBtn', 'leaveBtn', 'deleteBtn', 'sosBtn'].forEach((id) => {
+    document.getElementById(id).classList.add('hidden');
+  });
+
+  const chatBtn = document.getElementById('chatBtn');
+  chatBtn.classList.remove('hidden');
+  chatBtn.onclick = () => {
+    window.location.href = `chat.html?id=${encodeURIComponent(momentId)}&guest=${encodeURIComponent(guestToken)}`;
+  };
+
+  await loadParticipants();
+
+  loader.classList.add('hidden');
+  content.classList.remove('hidden');
+}
+
+function setupGuestDetailListeners() {
+  document.getElementById('backBtn').addEventListener('click', () => {
+    window.location.href = 'index.html';
+  });
+  const flagBtn = document.getElementById('flagBtn');
+  if (flagBtn) flagBtn.classList.add('hidden');
 }
 
 // ============================================================================

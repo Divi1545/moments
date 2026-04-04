@@ -32,6 +32,22 @@ function serveBrowserEnv(req, res) {
 app.get('/api/env', serveBrowserEnv);
 app.get('/api/env.js', serveBrowserEnv);
 
+// IslandLoaf Stay — public JSON API (requires SUPABASE_SERVICE_ROLE_KEY on server)
+const apiHandlers = require('./lib/moments-api-handlers');
+app.use(express.json({ limit: '48kb' }));
+
+app.use('/api/moments', (req, res, next) => {
+  apiHandlers.applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+app.get('/api/moments/nearby', apiHandlers.getNearby);
+app.post('/api/moments/:id/join', apiHandlers.postJoin);
+app.get('/api/moments/guest/verify', apiHandlers.getGuestVerify);
+app.get('/api/moments/guest/messages', apiHandlers.getGuestMessages);
+app.post('/api/moments/guest/messages', apiHandlers.postGuestMessage);
+
 // Inject environment variables into HTML
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') || req.path === '/') {
@@ -87,6 +103,9 @@ app.listen(PORT, '0.0.0.0', () => {
     console.warn('  - MAPBOX_TOKEN');
   } else {
     console.log('✅ Environment variables loaded');
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn('⚠️  SUPABASE_SERVICE_ROLE_KEY not set — IslandLoaf /api/moments/* will fail');
   }
 });
 

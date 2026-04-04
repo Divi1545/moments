@@ -10,14 +10,45 @@ let currentUser = null;
 let messagesChannel = null;
 let flaggedMessageId = null;
 let selectedChatImage = null;
+let guestChatToken = null;
+let guestPollTimer = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(window.location.search);
   momentId = params.get('id');
+  guestChatToken = params.get('guest');
 
   if (!momentId) {
     showError('Invalid moment ID');
+    return;
+  }
+
+  // IslandLoaf Stay — guest chat (no Supabase auth)
+  if (guestChatToken) {
+    try {
+      const vr = await fetch(`/api/moments/guest/verify?token=${encodeURIComponent(guestChatToken)}`);
+      const v = await vr.json();
+      if (!vr.ok || !v.valid || v.moment_id !== momentId) {
+        showError(v.error || 'Invalid guest link');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      showError('Could not verify guest link');
+      return;
+    }
+
+    currentUser = { id: '__guest__', isGuest: true };
+    const uploadBtn = document.getElementById('uploadImageBtn');
+    if (uploadBtn) uploadBtn.classList.add('hidden');
+
+    await loadMoment();
+    await loadGuestMessages();
+    setupGuestEventListeners();
+    guestPollTimer = setInterval(() => loadGuestMessages(), 4000);
+
+    document.getElementById('loader').classList.add('hidden');
     return;
   }
 
@@ -127,6 +158,113 @@ async function loadMessages() {
 
   // Scroll to bottom
   scrollToBottom();
+}
+
+// ============================================================================
+// Guest chat (IslandLoaf Stay — API relay, polled)
+// ============================================================================
+
+async function loadGuestMessages() {
+  if (!guestChatToken || !momentId) return;
+  try {
+    const r = await fetch(
+      `/api/moments/guest/messages?momentId=${encodeURIComponent(momentId)}&token=${encodeURIComponent(guestChatToken)}`
+    );
+    if (!r.ok) return;
+    const { messages } = await r.json();
+    const messagesList = document.getElementById('messagesList');
+    messagesList.innerHTML = '';
+
+    if (!messages || messages.length === 0) {
+      messagesList.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--gray-600);">
+        <p>No messages yet. Say hello!</p>
+      </div>
+    `;
+      return;
+    }
+
+    messages.forEach((m) => appendGuestMessage(m, false));
+    scrollToBottom();
+  } catch (e) {
+    console.error('loadGuestMessages', e);
+  }
+}
+
+function appendGuestMessage(msg, animate = false) {
+  const messagesList = document.getElementById('messagesList');
+  if (messagesList.querySelector('div[style*="text-align: center"]')) {
+    messagesList.innerHTML = '';
+  }
+
+  const displayName = msg.sender_name || 'Guest';
+  const initial = displayName.charAt(0).toUpperCase();
+  const isOwn = msg.is_own;
+
+  const messageEl = document.createElement('div');
+  messageEl.className = `message ${isOwn ? 'own' : ''}`;
+  if (animate) messageEl.style.animation = 'fadeIn 0.3s ease';
+
+  messageEl.innerHTML = `
+    <div class="message-avatar">${initial}</div>
+    <div class="message-content">
+      <div class="message-header">
+        <span class="message-sender">${escapeHtml(displayName)}</span>
+        <span class="message-time">${formatTime(msg.created_at)}</span>
+      </div>
+      <div class="message-bubble">${escapeHtml(msg.content)}</div>
+    </div>
+  `;
+
+  messagesList.appendChild(messageEl);
+}
+
+function setupGuestEventListeners() {
+  document.getElementById('backBtn').addEventListener('click', () => {
+    window.location.href = 'index.html';
+  });
+
+  document.getElementById('infoBtn').addEventListener('click', () => {
+    window.location.href = `moment.html?id=${encodeURIComponent(momentId)}&guest=${encodeURIComponent(guestChatToken)}`;
+  });
+
+  const form = document.getElementById('messageForm');
+  const input = document.getElementById('messageInput');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const content = input.value.trim();
+    if (!content) return;
+
+    input.disabled = true;
+    input.value = '';
+
+    try {
+      const r = await fetch('/api/moments/guest/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          momentId,
+          token: guestChatToken,
+          content,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        showToast(data.error || 'Could not send', 'error');
+        input.value = content;
+      } else {
+        await loadGuestMessages();
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Could not send message', 'error');
+      input.value = content;
+    }
+
+    input.disabled = false;
+    input.focus();
+  });
 }
 
 // ============================================================================
@@ -491,6 +629,9 @@ function showError(message) {
 window.addEventListener('beforeunload', () => {
   if (messagesChannel) {
     supabase.removeChannel(messagesChannel);
+  }
+  if (guestPollTimer) {
+    clearInterval(guestPollTimer);
   }
 });
 
