@@ -2,7 +2,7 @@
 // Map View - Main page logic
 // ============================================================================
 
-import { supabase, mapboxToken, getCurrentUser, checkProfileExists, formatDateTime, showToast } from './config.js';
+import { supabase, mapboxToken, getCurrentUser, checkProfileExists, formatDateTime, showToast, getPublicOrigin } from './config.js';
 import { validateImage, compressImage, createSquareThumbnail, getPreviewUrl } from './imageUtils.js';
 
 let map = null;
@@ -17,6 +17,31 @@ let currentSearchQuery = '';
 let sosChannel = null;
 let isSelectingLocation = false;
 let tempFormData = {};
+
+// Map popup — Share link for Instagram Story (native share sheet on mobile; copy fallback)
+if (typeof window !== 'undefined') {
+  window.momentsShareToStory = async (momentId) => {
+    const url = `${getPublicOrigin()}/moment.html?id=${encodeURIComponent(momentId)}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Moments',
+          text: `Share on Instagram Story — add a link sticker and paste:\n${url}`,
+          url,
+        });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Link copied — Instagram → Story → link sticker → paste', 'success');
+    } catch {
+      window.prompt('Copy this link for your Instagram Story:', url);
+    }
+  };
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -718,13 +743,24 @@ async function loadNearbyMoments(searchQuery = null, radiusKm = 50) {
             ${isUserMoment ? '<p style="color: #fbbf24; font-weight: bold;">⭐ Your Moment</p>' : ''}
             <p>${formatDateTime(moment.starts_at)}</p>
             <p>👥 ${participantCount}/${moment.max_participants}</p>
-            <button 
-              class="btn-primary" 
-              onclick="window.location.href='moment.html?id=${moment.id}'"
-              style="margin-top: 8px;"
-            >
-              View Details
-            </button>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+              <button 
+                type="button"
+                class="btn-primary" 
+                onclick="window.location.href='moment.html?id=${moment.id}'"
+              >
+                View Details
+              </button>
+              <button
+                type="button"
+                onclick="window.momentsShareToStory && window.momentsShareToStory('${moment.id}')"
+                style="width:100%; padding:10px 12px; border-radius:12px; font-weight:700; cursor:pointer;
+                  background:linear-gradient(135deg,#E1306C 0%,#F77737 50%,#FCAF45 100%);
+                  color:#fff; border:none; font-size:14px;"
+              >
+                📸 Share for Instagram Story
+              </button>
+            </div>
           </div>
         `);
 

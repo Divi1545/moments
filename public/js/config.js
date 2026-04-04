@@ -27,6 +27,15 @@ console.log('Supabase client initialized successfully');
 
 export const mapboxToken = MAPBOX_TOKEN;
 
+/** Canonical origin for shared links (PUBLIC_SITE_URL) or current host */
+export function getPublicOrigin() {
+  const raw = (window.ENV?.PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
+  if (raw) {
+    return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  }
+  return window.location.origin;
+}
+
 // Helper: Get current user
 export async function getCurrentUser() {
   const { data: { user }, error } = await supabase.auth.getUser();
